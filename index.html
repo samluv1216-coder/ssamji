@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>쌈지(SSAMJI) — 투자도 경제도, 쌈지에 담다</title>
+  <link rel="stylesheet" href="css/styles.css?v=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📈%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- 헤더 -->
+<header class="hdr">
+  <div class="hdr-l">
+    <div class="logo">📈</div>
+    <div class="brand">
+      <div class="brand-t">쌈지 <span class="brand-en">(SSAMJI)</span></div>
+      <div class="brand-slogan">투자도 경제도, 쌈지에 담다</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="clock-panel">
+      <div class="clock-date" id="clockDate">2021-01-04</div>
+      <div class="clock-controls">
+        <button class="btn-icon" id="btnRewind" title="처음으로">⏮</button>
+        <button class="btn-play" id="btnPlay" title="재생/일시정지">▶</button>
+        <button class="btn-icon" id="btnStep" title="하루 넘기기">⏭</button>
+        <select id="speedSel" title="배속">
+          <option value="1">1x</option>
+          <option value="2">2x</option>
+          <option value="5" selected>5x</option>
+          <option value="10">10x</option>
+          <option value="30">30x</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-plain" id="btnSettings" title="설정">⚙️</button>
+    <div class="credit">© 2026 Eunsoon</div>
+  </div>
+</header>
+
+<!-- 자산 요약 바 -->
+<div class="wallet">
+  <div class="wallet-item">
+    <div class="wl-lbl">총 자산</div>
+    <div class="wl-val" id="wTotal">10,000,000원</div>
+  </div>
+  <div class="wallet-item">
+    <div class="wl-lbl">보유 현금</div>
+    <div class="wl-val" id="wCash">10,000,000원</div>
+  </div>
+  <div class="wallet-item">
+    <div class="wl-lbl">수익률</div>
+    <div class="wl-val" id="wReturn">+0.00%</div>
+  </div>
+  <div class="wallet-item">
+    <div class="wl-lbl">경과일</div>
+    <div class="wl-val" id="wDays">0일</div>
+  </div>
+</div>
+
+<!-- 메인 탭 -->
+<nav class="tabs">
+  <button class="tab active" data-tab="market">📊 시장</button>
+  <button class="tab" data-tab="portfolio">💼 내 포트폴리오</button>
+  <button class="tab" data-tab="journal">📝 거래일지</button>
+  <button class="tab" data-tab="learn">🎓 학습</button>
+  <button class="tab" data-tab="rank">🏆 학급 랭킹</button>
+</nav>
+
+<!-- 시장 뷰 -->
+<main class="view active" id="view-market">
+  <div class="market-hdr">
+    <input id="searchInput" class="search" placeholder="종목명 또는 종목코드 검색" />
+    <div class="cat-chips" id="catChips"></div>
+    <div class="sort-sel">
+      정렬:
+      <select id="sortSel">
+        <option value="name">가나다순</option>
+        <option value="up">상승률 높은순</option>
+        <option value="down">하락률 큰순</option>
+        <option value="vol">거래대금순</option>
+      </select>
+    </div>
+  </div>
+  <div class="stock-grid" id="stockGrid"></div>
+</main>
+
+<!-- 포트폴리오 뷰 -->
+<main class="view" id="view-portfolio">
+  <div class="pf-hdr">
+    <h2>내 포트폴리오</h2>
+    <div class="pf-actions">
+      <button class="btn-plain" id="btnResetPort" title="처음부터 다시">🔄 초기화</button>
+    </div>
+  </div>
+  <div id="pfHoldings" class="pf-holdings"></div>
+</main>
+
+<!-- 거래일지 뷰 -->
+<main class="view" id="view-journal">
+  <div class="jn-hdr">
+    <h2>거래일지</h2>
+    <div class="jn-actions">
+      <button class="btn-plain" id="btnAiJournal">✨ AI 학습일지 만들기</button>
+    </div>
+  </div>
+  <div id="jnList" class="jn-list"></div>
+  <div id="jnAiBox" class="jn-ai-box" hidden></div>
+</main>
+
+<!-- 학습 뷰 -->
+<main class="view" id="view-learn">
+  <div class="ln-hdr"><h2>🎓 경제 학습</h2></div>
+  <section>
+    <h3>미션 · 배지</h3>
+    <div id="missionGrid" class="mission-grid"></div>
+  </section>
+  <section>
+    <h3>경제 개념 카드</h3>
+    <div id="conceptGrid" class="concept-grid"></div>
+  </section>
+</main>
+
+<!-- 랭킹 뷰 -->
+<main class="view" id="view-rank">
+  <div class="rk-hdr">
+    <h2>🏆 학급 랭킹</h2>
+    <div class="rk-actions" id="rkActions"></div>
+  </div>
+  <div id="rkStatus" class="rk-status"></div>
+  <div id="rkList" class="rk-list"></div>
+</main>
+
+<!-- 종목 상세 모달 -->
+<div class="modal-back" id="stockModal" hidden>
+  <div class="modal stock-modal">
+    <button class="modal-x" data-close-modal>✕</button>
+    <div id="smBody"></div>
+  </div>
+</div>
+
+<!-- 설정 모달 -->
+<div class="modal-back" id="settingsModal" hidden>
+  <div class="modal settings-modal">
+    <button class="modal-x" data-close-modal>✕</button>
+    <h2>⚙️ 설정</h2>
+    <section class="stg-sec">
+      <h3>AI 기능</h3>
+      <div class="stg-row">
+        <label><input type="radio" name="aiMode" value="off"> 사용 안 함 (순수 시뮬레이션)</label>
+        <label><input type="radio" name="aiMode" value="personal"> 개인 키 사용 (BYOK)</label>
+      </div>
+      <div class="stg-row">
+        <label>제공자:
+          <select id="aiProvider">
+            <option value="claude">Claude</option>
+            <option value="gemini">Gemini (무료 티어)</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </label>
+      </div>
+      <div class="stg-row">
+        <label>API 키: <input type="password" id="aiKey" placeholder="sk-... / AIza..."></label>
+        <button class="btn-plain sm" id="btnSaveKey">저장</button>
+      </div>
+      <p class="stg-help">키는 이 기기의 브라우저에만 저장되고 서버로 보내지 않아요.</p>
+    </section>
+    <section class="stg-sec">
+      <h3>학급 랭킹 (Firebase)</h3>
+      <div id="grpBox"></div>
+    </section>
+    <section class="stg-sec">
+      <h3>시뮬레이션</h3>
+      <div class="stg-row">
+        <button class="btn-plain" id="btnResetAll">🔄 모든 데이터 초기화 (시드머니 다시 1천만원)</button>
+      </div>
+      <div class="stg-row">
+        <a href="#" id="btnHelp">❔ 사용법 안내</a>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 학급 그룹 게이트 (첫 사용 시) -->
+<div class="modal-back" id="groupGate" hidden>
+  <div class="modal group-gate">
+    <h2>🏫 학급 참가</h2>
+    <p>선생님께서 알려주신 학급 코드로 참가하거나, 개인 모드로 계속 진행할 수 있어요.</p>
+    <div class="grp-tabs">
+      <button class="grp-tab active" data-grp="join">코드로 참가</button>
+      <button class="grp-tab" data-grp="create">학급 만들기 (선생님)</button>
+    </div>
+    <div class="grp-body" id="grpJoin">
+      <label>내 이름·별명 <input id="gjNick" maxlength="20" placeholder="예) 2-3 김철수"></label>
+      <label>학급 코드 (6자리) <input id="gjCode" maxlength="6" style="text-transform:uppercase" placeholder="예) A3K9PZ"></label>
+      <button class="btn-primary" id="btnGrpJoin">참가</button>
+    </div>
+    <div class="grp-body" id="grpCreate" hidden>
+      <label>학급명 <input id="gcName" maxlength="30" placeholder="예) 모가중 2-3반 경제탐구"></label>
+      <label>내 이름·별명 <input id="gcNick" maxlength="20" placeholder="예) 선생님"></label>
+      <button class="btn-primary" id="btnGrpCreate">학급 만들기</button>
+    </div>
+    <button class="btn-plain sm" id="btnGrpSkip">개인 모드로 계속하기</button>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast" class="toast" hidden></div>
+
+<!-- Firebase SDK (compat) — 학급 랭킹 사용 시만 필요 -->
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- 앱 스크립트 (순서 중요) -->
+<script src="js/settings.js?v=1"></script>
+<script src="js/data.js?v=1"></script>
+<script src="js/prices.js?v=1"></script>
+<script src="js/clock.js?v=1"></script>
+<script src="js/portfolio.js?v=1"></script>
+<script src="js/chart.js?v=1"></script>
+<script defer src="js/firebase-config.js?v=1"></script>
+<script defer src="js/group.js?v=1"></script>
+<script defer src="js/ranking.js?v=1"></script>
+<script src="js/ai.js?v=1"></script>
+<script defer src="js/app.js?v=1"></script>
+
+</body>
+</html>

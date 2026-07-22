@@ -1,0 +1,8 @@
+.git
+.gitignore
+.wrangler
+.assetsignore
+.claude
+node_modules
+*.md
+wrangler.toml
