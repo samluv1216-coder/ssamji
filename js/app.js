@@ -724,6 +724,9 @@
         '<button class="btn-plain sm" id="stgJoin">🏫 학급 참가·만들기</button>';
       on($('stgJoin'), 'click', function(){ $('settingsModal').hidden = true; $('groupGate').hidden = false; });
     }
+    // 「모든 데이터 초기화」는 교사(학급 생성자)에게만 노출 — 학생 실수 방지
+    var rowReset = $('rowResetAll');
+    if(rowReset) rowReset.hidden = !SSAMJI_GROUP.isAdmin();
     $('settingsModal').hidden = false;
   }
   function closeSettings(){ $('settingsModal').hidden = true; }
