@@ -606,3 +606,16 @@ a:hover { text-decoration: underline; }
   .pf-row .pf-col:not(.pf-col-eval) { display: none; }
   .sm-trade { grid-template-columns: 1fr; }
 }
+
+/* 사이트 푸터 */
+.site-foot {
+  text-align: center;
+  padding: 22px 16px 30px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.site-foot a { color: var(--muted); text-decoration: underline; }
+.site-foot a:hover { color: var(--brand); }
