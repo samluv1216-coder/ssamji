@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>쌈지(SSAMJI) — 투자도 경제도, 쌈지에 담다</title>
-  <link rel="stylesheet" href="css/styles.css?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=7">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📈%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -171,6 +171,13 @@
   </section>
   <section>
     <h3>경제 개념 카드</h3>
+    <div class="cc-search">
+      <div class="cc-search-wrap">
+        <input id="conceptSearch" class="cc-search-input" placeholder="🔍 개념 검색 (예: 배당, 금리, ETF, 복리)">
+        <button class="cc-search-clear" id="conceptClear" title="지우기" hidden>✕</button>
+      </div>
+      <span class="cc-count" id="conceptCount"></span>
+    </div>
     <div id="conceptGrid" class="concept-grid"></div>
   </section>
 </main>
@@ -327,7 +334,7 @@
 
 <!-- 앱 스크립트 (순서 중요) -->
 <script src="js/settings.js?v=1"></script>
-<script src="js/data.js?v=1"></script>
+<script src="js/data.js?v=2"></script>
 <script src="js/prices.js?v=1"></script>
 <script src="js/clock.js?v=1"></script>
 <script src="js/portfolio.js?v=1"></script>
@@ -337,7 +344,7 @@
 <script defer src="js/ranking.js?v=2"></script>
 <script src="js/ai.js?v=1"></script>
 <script src="js/news.js?v=1"></script>
-<script defer src="js/app.js?v=6"></script>
+<script defer src="js/app.js?v=7"></script>
 
 </body>
 </html>

@@ -451,9 +451,28 @@
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
   // ---------------- 학습 ----------------
+  var conceptWired = false;
   function renderLearn(){
     renderMissions();
-    renderConcepts();
+    if(!conceptWired){
+      conceptWired = true;
+      on($('conceptSearch'), 'input', function(){
+        $('conceptClear').hidden = !this.value;
+        renderConcepts(this.value);
+      });
+      on($('conceptClear'), 'click', function(){
+        var inp = $('conceptSearch'); inp.value=''; this.hidden = true; renderConcepts(''); inp.focus();
+      });
+    }
+    renderConcepts($('conceptSearch') ? $('conceptSearch').value : '');
+  }
+  // 검색어를 HTML-escape 후 안전하게 하이라이트
+  function hlText(text, q){
+    var esc = escapeHtml(text);
+    if(!q) return esc;
+    var eq = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    try{ return esc.replace(new RegExp(eq, 'gi'), function(m){ return '<mark>'+m+'</mark>'; }); }
+    catch(e){ return esc; }
   }
   function renderMissions(){
     var s = SSAMJI_PORT.summary();
@@ -468,13 +487,26 @@
       '</div>';
     }).join('');
   }
-  function renderConcepts(){
+  function renderConcepts(q){
     var box = $('conceptGrid');
-    box.innerHTML = SSAMJI_CONCEPTS.map(function(c){
+    var query = (q||'').trim().toLowerCase();
+    var list = SSAMJI_CONCEPTS.filter(function(c){
+      if(!query) return true;
+      var hay = (c.title+' '+c.body+' '+(c.keywords||'')+' '+(c.cat||'')).toLowerCase();
+      return hay.indexOf(query) !== -1;
+    });
+    var cnt = $('conceptCount');
+    if(cnt) cnt.textContent = query ? ('검색 결과 '+list.length+'개') : ('총 '+SSAMJI_CONCEPTS.length+'개');
+    if(list.length === 0){
+      box.innerHTML = '<div class="cc-empty">‘'+escapeHtml(q)+'’에 대한 개념이 없어요.<br>다른 단어로 검색해 보세요. (예: 배당, 금리, 분산, 복리)</div>';
+      return;
+    }
+    box.innerHTML = list.map(function(c){
       return '<div class="concept-card">' +
-        '<div class="cc-icon">'+c.icon+'</div>' +
-        '<div class="cc-title">'+c.title+'</div>' +
-        '<div class="cc-body">'+c.body+'</div>' +
+        '<div class="cc-top"><span class="cc-icon">'+c.icon+'</span>' +
+        (c.cat?'<span class="cc-cat">'+escapeHtml(c.cat)+'</span>':'') + '</div>' +
+        '<div class="cc-title">'+hlText(c.title, query)+'</div>' +
+        '<div class="cc-body">'+hlText(c.body, query)+'</div>' +
       '</div>';
     }).join('');
   }
