@@ -47,6 +47,7 @@
     renderWallet();
     setupSettings();
     setupModals();
+    setupNews();
 
     // 반응: 클럭·포트 변경 → 화면 갱신
     SSAMJI_CLOCK.onChange(function(snap){
@@ -93,6 +94,7 @@
         if(name === 'market') renderStocks();
         if(name === 'portfolio') renderPortfolio();
         if(name === 'journal') renderJournal();
+        if(name === 'news') renderNews();
         if(name === 'learn') renderLearn();
         if(name === 'rank') renderRanking();
       });
@@ -654,6 +656,153 @@
     pushTimer = setTimeout(function(){
       SSAMJI_GROUP.pushMyStanding();
     }, 3000);
+  }
+
+  // ---------------- 오늘의 뉴스 ----------------
+  var newsDate = null;   // 뉴스 탭에서 보고 있는 날짜 (YYYY-MM-DD)
+
+  function clampNewsDate(s){
+    var N = SSAMJI_NEWS, min = N.fmt(SSAMJI_SIM_START), max = N.fmt(SSAMJI_SIM_END);
+    if(s < min) return min;
+    if(s > max) return max;
+    return s;
+  }
+  function shiftNewsDate(days){
+    var d = SSAMJI_NEWS.toDate(newsDate); d.setDate(d.getDate()+days);
+    newsDate = clampNewsDate(SSAMJI_NEWS.fmt(d));
+    renderNews();
+  }
+  function setupNews(){
+    // 관련 종목 드롭다운 채우기 (지수 + 30종목)
+    var sel = $('nnStock');
+    if(sel && sel.options.length <= 1){
+      var opt = document.createElement('option'); opt.value='__index'; opt.textContent='증시 전반 (코스피/코스닥)'; sel.appendChild(opt);
+      SSAMJI_STOCKS.forEach(function(s){
+        var o = document.createElement('option'); o.value=s.ticker; o.textContent=s.name+' ('+s.sector+')'; sel.appendChild(o);
+      });
+    }
+    on($('nwPrev'), 'click', function(){ shiftNewsDate(-1); });
+    on($('nwNext'), 'click', function(){ shiftNewsDate(1); });
+    on($('nwToday'), 'click', function(){ newsDate = SSAMJI_CLOCK.getDate(); renderNews(); });
+    on($('nwDate'), 'change', function(){ if(this.value){ newsDate = clampNewsDate(this.value); renderNews(); } });
+    on($('nwSearchBtn'), 'click', function(){ doNewsSearch($('nwQuery').value.trim()); });
+    on($('nwQuery'), 'keydown', function(e){ if(e.key==='Enter') doNewsSearch(this.value.trim()); });
+    on($('nnSave'), 'click', saveIssueNote);
+    on($('nnPrint'), 'click', printNotes);
+  }
+  function doNewsSearch(q){
+    if(!q){ toast('검색어를 입력하세요.', 'warn'); return; }
+    window.open(SSAMJI_NEWS.naverNewsUrl(q, newsDate), '_blank', 'noopener');
+  }
+  function renderNews(){
+    if(!newsDate) newsDate = SSAMJI_CLOCK.getDate() || SSAMJI_NEWS.fmt(SSAMJI_SIM_START);
+    newsDate = clampNewsDate(newsDate);
+    if($('nwDate')) $('nwDate').value = newsDate;
+
+    // 주요 이슈 카드
+    var list = $('nwList');
+    var items = SSAMJI_NEWS.newsForDate(newsDate, 21);
+    if(items.length === 0){
+      list.innerHTML = '<div class="nw-empty">이 날짜 주변엔 등록된 주요 이슈가 없어요.<br>아래 <b>실제 뉴스 검색</b>으로 그날의 소식을 직접 찾아보세요!</div>';
+    } else {
+      list.innerHTML = items.map(function(n){
+        var dirCls = n.dir==='up'?'up':(n.dir==='down'?'down':'mixed');
+        var dirTxt = n.dir==='up'?'▲ 상승 요인':(n.dir==='down'?'▼ 하락 요인':'↕ 혼조');
+        var secs = SSAMJI_NEWS.sectorLabels(n.sectors).map(function(s){ return '<span class="nw-sec-chip">'+escapeHtml(s)+'</span>'; }).join('');
+        return '<article class="nw-card '+dirCls+'">' +
+          '<div class="nw-card-top"><span class="nw-date-b">'+n.date+'</span>' +
+          '<span class="nw-dir '+dirCls+'">'+dirTxt+'</span></div>' +
+          '<h4>'+escapeHtml(n.title)+'</h4>' +
+          '<p class="nw-body">'+escapeHtml(n.body)+'</p>' +
+          '<div class="nw-secs">'+secs+'</div>' +
+          '<p class="nw-think">💭 '+escapeHtml(n.think)+'</p>' +
+          '<button class="btn-plain sm nw-usebtn" data-title="'+escapeHtml(n.title)+'">📝 이 이슈 기록하기</button>' +
+        '</article>';
+      }).join('');
+      list.querySelectorAll('.nw-usebtn').forEach(function(b){
+        on(b, 'click', function(){
+          $('nnText').value = b.getAttribute('data-title');
+          $('nnText').focus();
+          $('nnText').scrollIntoView({behavior:'smooth', block:'center'});
+        });
+      });
+    }
+
+    // 빠른 검색 버튼
+    var quick = $('nwQuick');
+    if(quick){
+      var qs = ['코스피','코스닥','반도체','금리','전기차 배터리','환율'];
+      quick.innerHTML = qs.map(function(q){ return '<button class="nw-qbtn" data-q="'+escapeHtml(q)+'">'+escapeHtml(q)+'</button>'; }).join('');
+      quick.querySelectorAll('.nw-qbtn').forEach(function(b){
+        on(b, 'click', function(){ doNewsSearch(b.getAttribute('data-q')); });
+      });
+    }
+
+    renderIssueNotes();
+  }
+  function saveIssueNote(){
+    var text = $('nnText').value.trim();
+    if(!text){ toast('이슈 내용을 적어주세요.', 'warn'); return; }
+    var stockVal = $('nnStock').value;
+    var stockName = '';
+    if(stockVal === '__index') stockName = '증시 전반';
+    else if(stockVal){ var s = SSAMJI_STOCKS.find(function(x){return x.ticker===stockVal;}); stockName = s?s.name:''; }
+    SSAMJI_NEWS.addNote({ date:newsDate, text:text, ticker:stockVal, stockName:stockName, expect:$('nnExpect').value });
+    $('nnText').value=''; $('nnStock').value=''; $('nnExpect').value='';
+    toast('📝 기록지에 저장했어요.', 'ok');
+    renderIssueNotes();
+  }
+  function expectBadge(e){
+    if(e==='up') return '<span class="nn-exp up">▲ 오를듯</span>';
+    if(e==='down') return '<span class="nn-exp down">▼ 내릴듯</span>';
+    if(e==='none') return '<span class="nn-exp">모름</span>';
+    return '';
+  }
+  function renderIssueNotes(){
+    var notes = SSAMJI_NEWS.getNotes();
+    var box = $('nnList');
+    $('nnCount').textContent = notes.length ? ('총 '+notes.length+'개 기록') : '';
+    if(!notes.length){ box.innerHTML = '<div class="nw-empty">아직 기록한 이슈가 없어요. 위에서 이슈를 찾아 적어보세요!</div>'; return; }
+    box.innerHTML = notes.map(function(n){
+      return '<div class="nn-item">' +
+        '<div class="nn-item-main">' +
+          '<span class="nn-date-b">'+n.date+'</span>' +
+          (n.stockName?'<span class="nn-stock-b">'+escapeHtml(n.stockName)+'</span>':'') +
+          expectBadge(n.expect) +
+          '<p class="nn-item-text">'+escapeHtml(n.text)+'</p>' +
+        '</div>' +
+        '<button class="nn-del" data-id="'+n.id+'" title="삭제">🗑️</button>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('.nn-del').forEach(function(b){
+      on(b, 'click', function(){
+        if(confirm('이 기록을 삭제할까요?')){ SSAMJI_NEWS.deleteNote(b.getAttribute('data-id')); renderIssueNotes(); }
+      });
+    });
+  }
+  function printNotes(){
+    var notes = SSAMJI_NEWS.getNotes();
+    if(!notes.length){ toast('인쇄할 기록이 없어요.', 'warn'); return; }
+    var g = SSAMJI_GROUP.getState();
+    var who = (g && g.myNickname) ? g.myNickname : '';
+    var rows = notes.slice().reverse().map(function(n, i){
+      var exp = n.expect==='up'?'▲ 오를듯':(n.expect==='down'?'▼ 내릴듯':(n.expect==='none'?'모름':''));
+      return '<tr><td>'+(i+1)+'</td><td>'+n.date+'</td><td>'+escapeHtml(n.stockName||'')+'</td>'+
+             '<td>'+escapeHtml(exp)+'</td><td>'+escapeHtml(n.text)+'</td></tr>';
+    }).join('');
+    var html = '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>이슈 기록지</title>'+
+      '<style>body{font-family:"Malgun Gothic",sans-serif;padding:24px;color:#111}'+
+      'h1{font-size:20px;margin:0 0 4px}.sub{color:#666;font-size:13px;margin:0 0 16px}'+
+      'table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:7px 9px;font-size:13px;text-align:left;vertical-align:top}'+
+      'th{background:#eee}td:nth-child(1){width:34px;text-align:center}td:nth-child(2){width:92px}td:nth-child(3){width:110px}td:nth-child(4){width:70px;text-align:center}'+
+      '@media print{@page{size:A4;margin:14mm}}</style></head><body>'+
+      '<h1>📝 쌈지 이슈 기록지</h1><p class="sub">'+(who?('이름/별명: '+escapeHtml(who)+' · '):'')+'총 '+notes.length+'개</p>'+
+      '<table><thead><tr><th>#</th><th>날짜</th><th>관련 종목</th><th>예상</th><th>이슈 내용</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></body></html>';
+    var w = window.open('', '_blank');
+    if(!w){ toast('팝업이 차단되었어요. 팝업을 허용해 주세요.', 'warn'); return; }
+    w.document.write(html); w.document.close();
+    w.onload = function(){ w.focus(); w.print(); };
   }
 
   // ---------------- 설정 모달 ----------------

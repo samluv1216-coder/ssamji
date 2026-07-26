@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>쌈지(SSAMJI) — 투자도 경제도, 쌈지에 담다</title>
-  <link rel="stylesheet" href="css/styles.css?v=4">
+  <link rel="stylesheet" href="css/styles.css?v=5">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📈%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -64,6 +64,7 @@
   <button class="tab active" data-tab="market">📊 시장</button>
   <button class="tab" data-tab="portfolio">💼 내 포트폴리오</button>
   <button class="tab" data-tab="journal">📝 거래일지</button>
+  <button class="tab" data-tab="news">📰 오늘의 뉴스</button>
   <button class="tab" data-tab="learn">🎓 학습</button>
   <button class="tab" data-tab="rank">🏆 학급 랭킹</button>
 </nav>
@@ -104,6 +105,60 @@
   </div>
   <div id="jnList" class="jn-list"></div>
   <div id="jnAiBox" class="jn-ai-box" hidden></div>
+</main>
+
+<!-- 오늘의 뉴스 뷰 -->
+<main class="view" id="view-news">
+  <div class="nw-hdr">
+    <h2>📰 오늘의 뉴스</h2>
+    <div class="nw-nav">
+      <button class="btn-icon" id="nwPrev" title="이전 날">◀</button>
+      <input type="date" id="nwDate" class="nw-date">
+      <button class="btn-icon" id="nwNext" title="다음 날">▶</button>
+      <button class="btn-plain sm" id="nwToday">시뮬 날짜로</button>
+    </div>
+  </div>
+  <p class="nw-intro">쌈지 주가는 학습용 가상 데이터예요. 아래는 <b>그 시기에 실제로 있었던 일</b>이니,
+    <b>“이런 일이 있으면 주가는 어떻게 움직일까?”</b>를 상상하며 살펴보고, 발견한 이슈를 아래 <b>기록지</b>에 적어보세요.</p>
+
+  <section class="nw-sec">
+    <h3>📌 이 시기의 주요 이슈</h3>
+    <div id="nwList" class="nw-list"></div>
+  </section>
+
+  <section class="nw-sec">
+    <h3>🔎 실제 뉴스 검색 <span class="nw-sub">(이 날짜로 네이버 뉴스가 새 탭에서 열려요)</span></h3>
+    <div class="nw-search">
+      <div class="nw-quick" id="nwQuick"></div>
+      <div class="nw-searchbar">
+        <input id="nwQuery" class="nw-query" placeholder="검색어 입력 (예: 반도체, 금리, 전기차)">
+        <button class="btn-primary sm" id="nwSearchBtn">검색</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="nw-sec">
+    <h3>📝 이슈 기록지</h3>
+    <p class="nw-sub">오늘 찾은 이슈와, 그게 어떤 종목에 영향을 줄지 적어두면 나만의 투자 근거가 됩니다.</p>
+    <div class="nw-form">
+      <textarea id="nnText" class="nn-text" rows="2" placeholder="발견한 이슈를 적어보세요 (예: 금리 인상 예고로 성장주가 흔들림)"></textarea>
+      <div class="nn-row">
+        <select id="nnStock" class="nn-stock"><option value="">관련 종목·업종 (선택)</option></select>
+        <select id="nnExpect" class="nn-expect">
+          <option value="">예상 영향 (선택)</option>
+          <option value="up">▲ 오를 것 같다</option>
+          <option value="down">▼ 내릴 것 같다</option>
+          <option value="none">잘 모르겠다</option>
+        </select>
+        <button class="btn-primary sm" id="nnSave">기록 저장</button>
+      </div>
+    </div>
+    <div class="nn-listhdr">
+      <span id="nnCount" class="nw-sub"></span>
+      <button class="btn-plain sm" id="nnPrint">🖨️ 기록지 인쇄</button>
+    </div>
+    <div id="nnList" class="nn-list"></div>
+  </section>
 </main>
 
 <!-- 학습 뷰 -->
@@ -237,7 +292,8 @@
 <script defer src="js/group.js?v=3"></script>
 <script defer src="js/ranking.js?v=2"></script>
 <script src="js/ai.js?v=1"></script>
-<script defer src="js/app.js?v=4"></script>
+<script src="js/news.js?v=1"></script>
+<script defer src="js/app.js?v=5"></script>
 
 </body>
 </html>
