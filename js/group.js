@@ -10,6 +10,14 @@
     return s;
   }
 
+  // PIN 해시 (SHA-256) — 원문 PIN은 저장하지 않음
+  async function sha256(str){
+    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.prototype.map.call(new Uint8Array(buf), function(b){
+      return ('0'+b.toString(16)).slice(-2);
+    }).join('');
+  }
+
   var state = {
     code: null,       // 소속 그룹 코드
     name: null,       // 학급명
@@ -28,7 +36,7 @@
   }
 
   // 그룹 생성 — Firestore에 신규 문서 만들고 초대 코드 발급
-  async function createGroup(className, nickname){
+  async function createGroup(className, nickname, pin){
     if(!SSAMJI_FB_READY) throw new Error('Firebase 인증이 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.');
     var db = SSAMJI_FB_DB;
     // 겹치지 않는 코드 만들기 (최대 5회 재시도)
@@ -39,12 +47,14 @@
       if(!snap.exists){ code = c; break; }
     }
     if(!code) throw new Error('코드 생성 실패. 다시 시도해 주세요.');
-    await db.collection('ssamji_groups').doc(code).set({
+    var groupDoc = {
       name: className,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: SSAMJI_FB_UID,
       memberCount: 1
-    });
+    };
+    if(pin){ groupDoc.teacherPinHash = await sha256(String(pin)); }
+    await db.collection('ssamji_groups').doc(code).set(groupDoc);
     // 본인 멤버 등록
     await db.collection('ssamji_groups').doc(code)
       .collection('members').doc(SSAMJI_FB_UID).set({
@@ -105,7 +115,33 @@
     }catch(e){ console.warn('[SSAMJI] pushMyStanding 실패:', e.message); }
   }
 
-  // 교사(그룹 생성자)만 true
+  // 교사 — 학급 코드 + PIN으로 다른 기기에서도 교사 권한 잠금 해제
+  // (member 문서는 만들지 않음 → 학생 랭킹에 안 뜸. pushMyStanding도 myNickname 없어 미전송)
+  async function teacherLogin(code, pin){
+    if(!SSAMJI_FB_READY) throw new Error('Firebase 연결이 필요해요.');
+    code = (code||'').toUpperCase().trim();
+    var snap = await SSAMJI_FB_DB.collection('ssamji_groups').doc(code).get();
+    if(!snap.exists) throw new Error('존재하지 않는 학급 코드입니다.');
+    var data = snap.data();
+    if(!data.teacherPinHash) throw new Error('이 학급에는 교사 PIN이 설정되어 있지 않아요. 학급을 만든 기기에서 먼저 PIN을 설정해 주세요.');
+    var h = await sha256(String(pin||''));
+    if(h !== data.teacherPinHash) throw new Error('PIN이 올바르지 않습니다.');
+    state.code = code; state.name = data.name; state.role = 'admin'; state.myNickname = null;
+    save();
+    return true;
+  }
+
+  // 교사 PIN 설정·변경 (학급 생성자·교사만)
+  async function setTeacherPin(pin){
+    if(!SSAMJI_FB_READY || !state.code) throw new Error('Firebase 연결이 필요해요.');
+    if(state.role !== 'admin') throw new Error('교사만 PIN을 설정할 수 있어요.');
+    if(!pin || String(pin).length < 4) throw new Error('PIN은 4자리 이상으로 정해 주세요.');
+    var h = await sha256(String(pin));
+    await SSAMJI_FB_DB.collection('ssamji_groups').doc(state.code).set({ teacherPinHash: h }, { merge:true });
+    return true;
+  }
+
+  // 교사(그룹 생성자·PIN 로그인)만 true
   function isAdmin(){ return state.role === 'admin' && !!state.code; }
 
   // 선택한 학생들 포트폴리오 원격 초기화 요청
@@ -142,6 +178,8 @@
     pushMyStanding: pushMyStanding,
     isAdmin: isAdmin,
     requestReset: requestReset,
+    teacherLogin: teacherLogin,
+    setTeacherPin: setTeacherPin,
     getState: function(){ return state; }
   };
 })();

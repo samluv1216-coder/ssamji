@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>쌈지(SSAMJI) — 투자도 경제도, 쌈지에 담다</title>
-  <link rel="stylesheet" href="css/styles.css?v=3">
+  <link rel="stylesheet" href="css/styles.css?v=4">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📈%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -189,6 +189,7 @@
     <div class="grp-tabs">
       <button class="grp-tab active" data-grp="join">코드로 참가</button>
       <button class="grp-tab" data-grp="create">학급 만들기 (선생님)</button>
+      <button class="grp-tab" data-grp="teacher">🔐 교사 로그인</button>
     </div>
     <div class="grp-body" id="grpJoin">
       <label>내 이름·별명 <input id="gjNick" maxlength="20" placeholder="예) 2-3 김철수"></label>
@@ -198,7 +199,15 @@
     <div class="grp-body" id="grpCreate" hidden>
       <label>학급명 <input id="gcName" maxlength="30" placeholder="예) 모가중 2-3반 경제탐구"></label>
       <label>내 이름·별명 <input id="gcNick" maxlength="20" placeholder="예) 선생님"></label>
+      <label>교사 PIN (4자리 이상, 선택) <input id="gcPin" type="password" inputmode="numeric" maxlength="12" placeholder="다른 기기에서 교사 로그인에 사용"></label>
       <button class="btn-primary" id="btnGrpCreate">학급 만들기</button>
+      <p class="grp-hint">PIN을 정해 두면 다른 기기·다른 브라우저에서도 「교사 로그인」으로 교사 기능을 쓸 수 있어요.</p>
+    </div>
+    <div class="grp-body" id="grpTeacher" hidden>
+      <label>학급 코드 (6자리) <input id="gtCode" maxlength="6" style="text-transform:uppercase" placeholder="예) A3K9PZ"></label>
+      <label>교사 PIN <input id="gtPin" type="password" inputmode="numeric" maxlength="12" placeholder="학급 만들 때 정한 PIN"></label>
+      <button class="btn-primary" id="btnTeacherLogin">교사 로그인</button>
+      <p class="grp-hint">학생 명단·랭킹에는 나타나지 않고, 학생 초기화 등 교사 기능만 켜집니다.</p>
     </div>
     <button class="btn-plain sm" id="btnGrpSkip">개인 모드로 계속하기</button>
   </div>
@@ -225,10 +234,10 @@
 <script src="js/portfolio.js?v=1"></script>
 <script src="js/chart.js?v=1"></script>
 <script defer src="js/firebase-config.js?v=1"></script>
-<script defer src="js/group.js?v=2"></script>
+<script defer src="js/group.js?v=3"></script>
 <script defer src="js/ranking.js?v=2"></script>
 <script src="js/ai.js?v=1"></script>
-<script defer src="js/app.js?v=3"></script>
+<script defer src="js/app.js?v=4"></script>
 
 </body>
 </html>

@@ -585,15 +585,18 @@ a:hover { text-decoration: underline; }
 .grp-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
 .grp-tab {
   flex: 1;
-  padding: 8px;
+  padding: 8px 6px;
   background: var(--brand-soft);
   border: none;
   color: var(--brand);
   border-radius: 8px;
   font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
 }
 .grp-tab.active { background: var(--brand); color: white; }
 .grp-body { display: grid; gap: 12px; }
+.grp-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0; }
 .grp-body label { display: block; font-size: 13px; color: var(--text-2); }
 .grp-body input {
   width: 100%;

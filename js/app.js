@@ -556,14 +556,18 @@
     if(!box) return;
     if(!SSAMJI_GROUP.isAdmin()){ box.hidden = true; box.innerHTML = ''; return; }
     box.hidden = false;
-    var others = (members||[]).filter(function(m){ return m.uid !== SSAMJI_FB_UID; });
+    // 교사(본인·admin)는 초기화 대상에서 제외
+    var others = (members||[]).filter(function(m){ return m.uid !== SSAMJI_FB_UID && m.role !== 'admin'; });
     // 사라진 학생은 선택 목록에서 제거
     var present = {}; others.forEach(function(m){ present[m.uid]=1; });
     Object.keys(tpChecked).forEach(function(u){ if(!present[u]) delete tpChecked[u]; });
 
+    var pinBtn = '<button class="btn-plain sm" id="btnSetPin">🔐 교사 PIN 설정·변경</button>';
     if(others.length === 0){
       box.innerHTML = '<div class="tp-head">🎓 교사 관리</div>' +
-        '<div class="tp-hint">학생이 학급에 참가하면 여기에서 개별로 초기화할 수 있어요.</div>';
+        '<div class="tp-hint">학생이 학급에 참가하면 여기에서 개별로 초기화할 수 있어요.</div>' +
+        '<div class="tp-actions" style="justify-content:flex-end">' + pinBtn + '</div>';
+      wirePinBtn(box);
       return;
     }
     box.innerHTML =
@@ -580,9 +584,11 @@
       '</div>' +
       '<div class="tp-actions">' +
       '<label class="tp-all"><input type="checkbox" id="tpAll"> 전체 선택</label>' +
-      '<button class="btn-primary sm" id="btnTpReset">선택 학생 초기화</button>' +
+      '<span style="display:flex;gap:8px">' + pinBtn +
+      '<button class="btn-primary sm" id="btnTpReset">선택 학생 초기화</button></span>' +
       '</div>';
 
+    wirePinBtn(box);
     box.querySelectorAll('.tp-ck').forEach(function(c){
       on(c, 'change', function(){ tpChecked[this.value] = this.checked; syncTpAll(box); });
     });
@@ -606,6 +612,17 @@
     var checked = box.querySelectorAll('.tp-ck:checked');
     var el = $('tpAll');
     if(el && all.length){ el.checked = (all.length === checked.length); }
+  }
+  function wirePinBtn(box){
+    on($('btnSetPin'), 'click', function(){
+      var pin = prompt('교사 PIN을 정하세요 (4자리 이상 숫자 권장).\n다른 기기에서 「교사 로그인」에 사용합니다.');
+      if(pin === null) return;
+      pin = String(pin).trim();
+      if(pin.length < 4){ toast('PIN은 4자리 이상으로 정해 주세요.', 'warn'); return; }
+      SSAMJI_GROUP.setTeacherPin(pin).then(function(){
+        toast('🔐 교사 PIN이 설정되었어요.', 'ok');
+      }).catch(function(e){ toast('PIN 설정 실패: ' + e.message, 'warn'); });
+    });
   }
 
   // 학생 측: 교사가 보낸 초기화 신호 감지 → 스스로 초기화
@@ -668,15 +685,31 @@
       runAiJournal();
     });
 
-    // 그룹 게이트 이벤트
+    // 그룹 게이트 이벤트 (참가 / 만들기 / 교사 로그인)
     document.querySelectorAll('.grp-tab').forEach(function(t){
       on(t, 'click', function(){
         document.querySelectorAll('.grp-tab').forEach(function(x){x.classList.remove('active');});
         t.classList.add('active');
-        var isJoin = t.dataset.grp === 'join';
-        $('grpJoin').hidden = !isJoin;
-        $('grpCreate').hidden = isJoin;
+        var g = t.dataset.grp;
+        $('grpJoin').hidden = (g !== 'join');
+        $('grpCreate').hidden = (g !== 'create');
+        $('grpTeacher').hidden = (g !== 'teacher');
       });
+    });
+    on($('btnTeacherLogin'), 'click', async function(){
+      var code = $('gtCode').value.trim().toUpperCase();
+      var pin = $('gtPin').value.trim();
+      if(code.length !== 6){ toast('학급 코드는 6자리예요', 'err'); return; }
+      if(!pin){ toast('교사 PIN을 입력해 주세요', 'err'); return; }
+      try{
+        await SSAMJI_GROUP.teacherLogin(code, pin);
+        toast('🔐 교사 로그인 완료', 'ok');
+        $('groupGate').hidden = true;
+        if(SSAMJI_FB_READY) SSAMJI_RANK.subscribe();
+        state.activeTab = 'rank';
+        document.querySelector('[data-tab="rank"]').click();
+        renderRanking();
+      }catch(e){ toast('❌ '+e.message, 'err'); }
     });
     on($('btnGrpJoin'), 'click', async function(){
       var nick = $('gjNick').value.trim();
@@ -693,9 +726,11 @@
     on($('btnGrpCreate'), 'click', async function(){
       var name = $('gcName').value.trim();
       var nick = $('gcNick').value.trim();
+      var pin = ($('gcPin') ? $('gcPin').value.trim() : '');
       if(!name || !nick){ toast('학급명·별명을 입력해 주세요', 'err'); return; }
+      if(pin && pin.length < 4){ toast('교사 PIN은 4자리 이상으로 정해 주세요', 'err'); return; }
       try{
-        var code = await SSAMJI_GROUP.createGroup(name, nick);
+        var code = await SSAMJI_GROUP.createGroup(name, nick, pin);
         prompt('학급 코드가 발급됐어요. 학생들에게 이 코드를 알려주세요:', code);
         toast('학급 생성 완료: '+code, 'ok');
         $('groupGate').hidden = true;
