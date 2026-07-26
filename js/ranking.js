@@ -22,6 +22,7 @@
             returnPct: typeof d.returnPct === 'number' ? d.returnPct : 0,
             daysPassed: d.daysPassed || 0,
             role: d.role || 'member',
+            resetAt: (d.resetAt && d.resetAt.toMillis) ? d.resetAt.toMillis() : 0,
             updatedAt: d.updatedAt
           });
         });

@@ -105,6 +105,33 @@
     }catch(e){ console.warn('[SSAMJI] pushMyStanding 실패:', e.message); }
   }
 
+  // 교사(그룹 생성자)만 true
+  function isAdmin(){ return state.role === 'admin' && !!state.code; }
+
+  // 선택한 학생들 포트폴리오 원격 초기화 요청
+  // — 학생 기기의 localStorage는 교사가 직접 못 지우므로,
+  //   member 문서에 resetAt 신호를 남기면 학생 앱이 이를 감지해 스스로 초기화한다.
+  //   랭킹 수치도 즉시 시드머니로 낙관적 갱신(학생 재접속 전까지 표시용).
+  async function requestReset(uids){
+    if(!SSAMJI_FB_READY || !state.code) throw new Error('Firebase 연결이 필요해요.');
+    if(!isAdmin()) throw new Error('교사(학급 생성자)만 초기화할 수 있어요.');
+    if(!uids || !uids.length) return 0;
+    var db = SSAMJI_FB_DB;
+    var seed = (window.SSAMJI_PORT && SSAMJI_PORT.SEED_MONEY) || 10000000;
+    var col = db.collection('ssamji_groups').doc(state.code).collection('members');
+    var batch = db.batch();
+    uids.forEach(function(uid){
+      batch.set(col.doc(uid), {
+        resetAt: firebase.firestore.FieldValue.serverTimestamp(),
+        totalValue: seed,
+        returnPct: 0,
+        daysPassed: 0
+      }, { merge:true });
+    });
+    await batch.commit();
+    return uids.length;
+  }
+
   window.SSAMJI_GROUP = {
     load: load,
     save: save,
@@ -113,6 +140,8 @@
     joinGroup: joinGroup,
     leaveGroup: leaveGroup,
     pushMyStanding: pushMyStanding,
+    isAdmin: isAdmin,
+    requestReset: requestReset,
     getState: function(){ return state; }
   };
 })();

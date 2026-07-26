@@ -367,6 +367,38 @@ a:hover { text-decoration: underline; }
 .rk-ret.down { color: var(--down); }
 .rk-empty { text-align: center; padding: 40px 20px; color: var(--muted); background: white; border-radius: 12px; }
 
+/* ------------------- 교사 관리 패널 ------------------- */
+.rk-teacher {
+  background: var(--brand-soft);
+  border: 1px solid var(--brand);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.rk-teacher .tp-head { font-weight: 700; color: var(--brand-2); font-size: 15px; }
+.rk-teacher .tp-hint { font-size: 12px; color: var(--text-2); margin: 4px 0 10px; line-height: 1.5; }
+.tp-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.tp-item {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer;
+  font-size: 13px;
+}
+.tp-item:hover { border-color: var(--brand); }
+.tp-item input { width: 16px; height: 16px; accent-color: var(--brand); flex: none; cursor: pointer; }
+.tp-item .tp-nick { font-weight: 600; color: var(--text); }
+.tp-item .tp-val { margin-left: auto; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tp-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tp-all { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.tp-all input { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+
 /* ------------------- Modal ------------------- */
 .modal-back {
   position: fixed;

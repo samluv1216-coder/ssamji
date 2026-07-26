@@ -69,8 +69,10 @@
     setTimeout(function(){
       if(SSAMJI_CFG.get().firebaseEnabled && window.firebase){
         window.initFirebase && initFirebase();
-        // 랭킹 준비되면 자동 구독
+        // 랭킹 준비되면 자동 구독 + 교사 초기화 신호 감시
         document.addEventListener('ssamji:firebase-ready', function(){
+          // 교사가 보낸 초기화 신호(member.resetAt)를 감시 — 탭과 무관하게 항상 동작
+          SSAMJI_RANK.onChange(handleResetSignal);
           if(SSAMJI_GROUP.getState().code){
             SSAMJI_RANK.subscribe();
           }
@@ -529,6 +531,7 @@
   }
   function renderRankList(members){
     var list = $('rkList');
+    renderTeacherPanel(members);
     if(!members || members.length===0){
       list.innerHTML = '<div class="rk-empty">아직 참가자가 없어요. 학급 코드를 친구들에게 공유해 보세요!</div>';
       return;
@@ -543,6 +546,87 @@
         '<div class="rk-ret '+cls+'">'+(m.returnPct>=0?'+':'')+(m.returnPct*100).toFixed(2)+'%</div>' +
       '</div>';
     }).join('');
+  }
+
+  // ---------------- 교사용 원격 초기화 ----------------
+  var tpChecked = {};   // uid → 체크 여부 (잦은 랭킹 갱신에도 선택 유지)
+
+  function renderTeacherPanel(members){
+    var box = $('rkTeacher');
+    if(!box) return;
+    if(!SSAMJI_GROUP.isAdmin()){ box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    var others = (members||[]).filter(function(m){ return m.uid !== SSAMJI_FB_UID; });
+    // 사라진 학생은 선택 목록에서 제거
+    var present = {}; others.forEach(function(m){ present[m.uid]=1; });
+    Object.keys(tpChecked).forEach(function(u){ if(!present[u]) delete tpChecked[u]; });
+
+    if(others.length === 0){
+      box.innerHTML = '<div class="tp-head">🎓 교사 관리</div>' +
+        '<div class="tp-hint">학생이 학급에 참가하면 여기에서 개별로 초기화할 수 있어요.</div>';
+      return;
+    }
+    box.innerHTML =
+      '<div class="tp-head">🎓 교사 관리 · 학생 포트폴리오 초기화</div>' +
+      '<div class="tp-hint">초기화할 학생을 선택하세요. 선택한 학생 기기에서 시드머니 1천만원으로 자동 초기화됩니다.</div>' +
+      '<div class="tp-list">' +
+      others.map(function(m){
+        return '<label class="tp-item">' +
+          '<input type="checkbox" class="tp-ck" value="'+m.uid+'"'+(tpChecked[m.uid]?' checked':'')+'>' +
+          '<span class="tp-nick">'+escapeHtml(m.nickname||'익명')+'</span>' +
+          '<span class="tp-val">'+fmt(m.totalValue)+'원 · '+(m.returnPct>=0?'+':'')+(m.returnPct*100).toFixed(1)+'%</span>' +
+        '</label>';
+      }).join('') +
+      '</div>' +
+      '<div class="tp-actions">' +
+      '<label class="tp-all"><input type="checkbox" id="tpAll"> 전체 선택</label>' +
+      '<button class="btn-primary sm" id="btnTpReset">선택 학생 초기화</button>' +
+      '</div>';
+
+    box.querySelectorAll('.tp-ck').forEach(function(c){
+      on(c, 'change', function(){ tpChecked[this.value] = this.checked; syncTpAll(box); });
+    });
+    on($('tpAll'), 'change', function(){
+      var v = this.checked;
+      box.querySelectorAll('.tp-ck').forEach(function(c){ c.checked = v; tpChecked[c.value] = v; });
+    });
+    syncTpAll(box);
+    on($('btnTpReset'), 'click', function(){
+      var uids = Array.prototype.slice.call(box.querySelectorAll('.tp-ck:checked')).map(function(c){ return c.value; });
+      if(uids.length === 0){ toast('초기화할 학생을 먼저 선택하세요.', 'warn'); return; }
+      if(!confirm('선택한 ' + uids.length + '명의 포트폴리오를 초기화할까요?\n학생 기기에서 시드머니 1천만원으로 되돌아갑니다. 되돌릴 수 없어요.')) return;
+      SSAMJI_GROUP.requestReset(uids).then(function(n){
+        uids.forEach(function(u){ delete tpChecked[u]; });
+        toast('✅ ' + n + '명 초기화 요청 완료. 학생 화면에 곧 반영됩니다.', 'ok');
+      }).catch(function(e){ toast('초기화 실패: ' + e.message, 'warn'); });
+    });
+  }
+  function syncTpAll(box){
+    var all = box.querySelectorAll('.tp-ck');
+    var checked = box.querySelectorAll('.tp-ck:checked');
+    var el = $('tpAll');
+    if(el && all.length){ el.checked = (all.length === checked.length); }
+  }
+
+  // 학생 측: 교사가 보낸 초기화 신호 감지 → 스스로 초기화
+  function handleResetSignal(members){
+    if(!SSAMJI_FB_UID) return;
+    var me = null;
+    for(var i=0;i<members.length;i++){ if(members[i].uid === SSAMJI_FB_UID){ me = members[i]; break; } }
+    if(!me || !me.resetAt) return;
+    var ack = parseInt(localStorage.getItem('ssamji_reset_ack_v1') || '0', 10);
+    if(me.resetAt <= ack) return;
+    localStorage.setItem('ssamji_reset_ack_v1', String(me.resetAt));
+    // 교사가 나(학급 생성자) 자신을 초기화하는 경우는 드물지만, 신호가 오면 동일 처리
+    SSAMJI_PORT.reset();
+    SSAMJI_CLOCK.reset();
+    renderWallet();
+    renderPortfolio();
+    renderStocks();
+    renderJournal();
+    if(state.activeTab === 'learn') renderMissions();
+    toast('👩‍🏫 선생님이 포트폴리오를 초기화했어요. 시드머니 1천만원으로 다시 시작해요!', 'ok');
+    SSAMJI_GROUP.pushMyStanding();
   }
 
   // 랭킹 push 스로틀 (3초에 한 번)
@@ -571,13 +655,6 @@
         SSAMJI_CLOCK.reset();
         toast('초기화 완료', 'ok');
         closeSettings();
-      }
-    });
-    on($('btnResetPort'), 'click', function(){
-      if(confirm('포트폴리오를 초기화하시겠어요? 시드머니 1천만원으로 되돌립니다.')){
-        SSAMJI_PORT.reset();
-        SSAMJI_CLOCK.goToStart();
-        toast('초기화 완료', 'ok');
       }
     });
     document.querySelectorAll('input[name=aiMode]').forEach(function(r){
