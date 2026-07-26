@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>쌈지(SSAMJI) — 투자도 경제도, 쌈지에 담다</title>
-  <link rel="stylesheet" href="css/styles.css?v=5">
+  <link rel="stylesheet" href="css/styles.css?v=6">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📈%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -66,6 +66,7 @@
   <button class="tab" data-tab="journal">📝 거래일지</button>
   <button class="tab" data-tab="news">📰 오늘의 뉴스</button>
   <button class="tab" data-tab="learn">🎓 학습</button>
+  <button class="tab" data-tab="reflect">📔 성찰</button>
   <button class="tab" data-tab="rank">🏆 학급 랭킹</button>
 </nav>
 
@@ -171,6 +172,49 @@
   <section>
     <h3>경제 개념 카드</h3>
     <div id="conceptGrid" class="concept-grid"></div>
+  </section>
+</main>
+
+<!-- 성찰 뷰 -->
+<main class="view" id="view-reflect">
+  <div class="rf-hdr">
+    <h2>📔 수업 성찰지</h2>
+    <div class="rf-actions">
+      <button class="btn-plain sm" id="rfSave">💾 저장</button>
+      <button class="btn-primary sm" id="rfPrint">🖨️ 인쇄·제출</button>
+    </div>
+  </div>
+  <p class="rf-intro">모의투자 수업을 돌아보며 솔직하게 적어보세요. 쓴 내용은 <b>이 기기에 자동 저장</b>돼요.
+    손으로 쓴 성찰지가 있으면 사진으로 찍어 <b>첨부</b>할 수도 있어요.</p>
+
+  <section class="rf-sec">
+    <h3>✍️ 돌아보기</h3>
+    <label class="rf-q">1. 이번 모의투자에서 가장 기억에 남는 순간(거래)은 무엇이고, 왜 그런가요?
+      <textarea id="rfQ1" class="rf-ta" rows="3" placeholder="예) SK하이닉스를 팔지 말지 고민했던 순간…"></textarea></label>
+    <label class="rf-q">2. 내가 잘한 점은 무엇인가요?
+      <textarea id="rfQ2" class="rf-ta" rows="3"></textarea></label>
+    <label class="rf-q">3. 아쉬웠던 점과, 다음엔 이렇게 하고 싶다는 다짐은?
+      <textarea id="rfQ3" class="rf-ta" rows="3"></textarea></label>
+    <label class="rf-q">4. 투자하며 느낀 감정(조급함·욕심·불안 등)을 어떻게 다뤘나요? 새로 알게 된 경제 개념도 적어보세요.
+      <textarea id="rfQ4" class="rf-ta" rows="3"></textarea></label>
+  </section>
+
+  <section class="rf-sec">
+    <h3>💡 나만의 금융 원칙 3가지</h3>
+    <p class="nw-sub">이번 수업으로 세운, 앞으로 지킬 나만의 원칙을 적어보세요.</p>
+    <div class="rf-principles">
+      <label class="rf-pr"><span class="rf-prno">1</span><input id="rfP1" maxlength="120" placeholder="예) 남의 말만 듣고 사지 않는다"></label>
+      <label class="rf-pr"><span class="rf-prno">2</span><input id="rfP2" maxlength="120" placeholder="예) 한 종목에 몰아넣지 않는다"></label>
+      <label class="rf-pr"><span class="rf-prno">3</span><input id="rfP3" maxlength="120" placeholder="예) 살 때는 이유를 꼭 적는다"></label>
+    </div>
+  </section>
+
+  <section class="rf-sec">
+    <h3>📎 첨부파일 <span class="nw-sub">(사진·PDF 등, 손으로 쓴 성찰지도 찍어 올릴 수 있어요)</span></h3>
+    <input type="file" id="rfFile" accept="image/*,.pdf,.doc,.docx,.txt,.hwp,.hwpx" multiple hidden>
+    <button class="btn-plain sm" id="rfFileBtn">＋ 파일 선택</button>
+    <span class="nw-sub" id="rfFileHint"> 사진은 자동으로 줄여서 저장돼요 · 파일당 2MB 이하 · 최대 5개</span>
+    <div id="rfFiles" class="rf-files"></div>
   </section>
 </main>
 
@@ -293,7 +337,7 @@
 <script defer src="js/ranking.js?v=2"></script>
 <script src="js/ai.js?v=1"></script>
 <script src="js/news.js?v=1"></script>
-<script defer src="js/app.js?v=5"></script>
+<script defer src="js/app.js?v=6"></script>
 
 </body>
 </html>

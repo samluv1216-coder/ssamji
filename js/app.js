@@ -48,6 +48,7 @@
     setupSettings();
     setupModals();
     setupNews();
+    setupReflect();
 
     // 반응: 클럭·포트 변경 → 화면 갱신
     SSAMJI_CLOCK.onChange(function(snap){
@@ -96,6 +97,7 @@
         if(name === 'journal') renderJournal();
         if(name === 'news') renderNews();
         if(name === 'learn') renderLearn();
+        if(name === 'reflect') renderReflect();
         if(name === 'rank') renderRanking();
       });
     });
@@ -799,6 +801,146 @@
       '<h1>📝 쌈지 이슈 기록지</h1><p class="sub">'+(who?('이름/별명: '+escapeHtml(who)+' · '):'')+'총 '+notes.length+'개</p>'+
       '<table><thead><tr><th>#</th><th>날짜</th><th>관련 종목</th><th>예상</th><th>이슈 내용</th></tr></thead>'+
       '<tbody>'+rows+'</tbody></table></body></html>';
+    var w = window.open('', '_blank');
+    if(!w){ toast('팝업이 차단되었어요. 팝업을 허용해 주세요.', 'warn'); return; }
+    w.document.write(html); w.document.close();
+    w.onload = function(){ w.focus(); w.print(); };
+  }
+
+  // ---------------- 수업 성찰지 ----------------
+  var REFLECT_KEY = 'ssamji_reflect_v1';
+  var reflectData = null;
+  var RF_FIELDS = ['rfQ1','rfQ2','rfQ3','rfQ4','rfP1','rfP2','rfP3'];
+
+  function loadReflect(){
+    try{ reflectData = JSON.parse(localStorage.getItem(REFLECT_KEY)); }catch(e){}
+    if(!reflectData || typeof reflectData !== 'object'){
+      reflectData = { q1:'',q2:'',q3:'',q4:'', p1:'',p2:'',p3:'', files:[] };
+    }
+    if(!Array.isArray(reflectData.files)) reflectData.files = [];
+    return reflectData;
+  }
+  function saveReflect(){
+    try{ localStorage.setItem(REFLECT_KEY, JSON.stringify(reflectData)); return true; }
+    catch(e){
+      toast('저장 공간이 부족해요. 첨부파일을 줄여 주세요.', 'warn');
+      return false;
+    }
+  }
+  function setupReflect(){
+    loadReflect();
+    // 텍스트 입력 → 자동 저장
+    RF_FIELDS.forEach(function(id){
+      var key = id.slice(2).toLowerCase();   // rfQ1 → q1, rfP1 → p1
+      on($(id), 'input', function(){ reflectData[key] = this.value; saveReflect(); });
+    });
+    on($('rfSave'), 'click', function(){
+      RF_FIELDS.forEach(function(id){ reflectData[id.slice(2).toLowerCase()] = $(id).value; });
+      if(saveReflect()) toast('💾 저장했어요.', 'ok');
+    });
+    on($('rfPrint'), 'click', printReflect);
+    on($('rfFileBtn'), 'click', function(){ $('rfFile').click(); });
+    on($('rfFile'), 'change', function(){ handleReflectFiles(this.files); this.value=''; });
+  }
+  function renderReflect(){
+    loadReflect();
+    $('rfQ1').value = reflectData.q1||''; $('rfQ2').value = reflectData.q2||'';
+    $('rfQ3').value = reflectData.q3||''; $('rfQ4').value = reflectData.q4||'';
+    $('rfP1').value = reflectData.p1||''; $('rfP2').value = reflectData.p2||''; $('rfP3').value = reflectData.p3||'';
+    renderReflectFiles();
+  }
+  function handleReflectFiles(fileList){
+    var files = Array.prototype.slice.call(fileList||[]);
+    if(!files.length) return;
+    if(reflectData.files.length + files.length > 5){ toast('첨부는 최대 5개까지예요.', 'warn'); return; }
+    files.forEach(function(f){
+      fileToDataUrl(f, function(res){
+        if(res === '__TOOBIG__'){ toast('「'+f.name+'」은(는) 2MB를 넘어 첨부할 수 없어요.', 'warn'); return; }
+        if(!res){ toast('「'+f.name+'」 첨부에 실패했어요.', 'warn'); return; }
+        reflectData.files.push({ name:f.name, type:f.type, dataUrl:res });
+        if(saveReflect()) renderReflectFiles();
+      });
+    });
+  }
+  function fileToDataUrl(file, cb){
+    if(file.type && file.type.indexOf('image/')===0){
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function(){
+        var max=1200, w=img.width, h=img.height;
+        if(w>max || h>max){ var r=Math.min(max/w, max/h); w=Math.round(w*r); h=Math.round(h*r); }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url);
+        try{ cb(cv.toDataURL('image/jpeg', 0.8)); }catch(e){ cb(null); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); cb(null); };
+      img.src = url;
+    } else {
+      if(file.size > 2*1024*1024){ cb('__TOOBIG__'); return; }
+      var fr = new FileReader();
+      fr.onload = function(){ cb(fr.result); };
+      fr.onerror = function(){ cb(null); };
+      fr.readAsDataURL(file);
+    }
+  }
+  function renderReflectFiles(){
+    var box = $('rfFiles');
+    if(!box) return;
+    var fs = reflectData.files || [];
+    if(!fs.length){ box.innerHTML = ''; return; }
+    box.innerHTML = fs.map(function(f, i){
+      var isImg = (f.type||'').indexOf('image/')===0;
+      var thumb = isImg
+        ? '<img src="'+f.dataUrl+'" alt="">'
+        : '<div class="rf-fileicon">📄</div>';
+      return '<div class="rf-file">' + thumb +
+        '<span class="rf-fname">'+escapeHtml(f.name)+'</span>' +
+        '<button class="rf-fdel" data-i="'+i+'" title="삭제">✕</button>' +
+      '</div>';
+    }).join('');
+    box.querySelectorAll('.rf-fdel').forEach(function(b){
+      on(b, 'click', function(){
+        var i = parseInt(b.getAttribute('data-i'),10);
+        reflectData.files.splice(i,1);
+        saveReflect(); renderReflectFiles();
+      });
+    });
+  }
+  function printReflect(){
+    RF_FIELDS.forEach(function(id){ reflectData[id.slice(2).toLowerCase()] = $(id).value; });
+    saveReflect();
+    var g = SSAMJI_GROUP.getState();
+    var who = (g && g.myNickname) ? g.myNickname : '';
+    var qa = [
+      ['이번 모의투자에서 가장 기억에 남는 순간(거래)은?', reflectData.q1],
+      ['내가 잘한 점은?', reflectData.q2],
+      ['아쉬웠던 점과 다음 다짐은?', reflectData.q3],
+      ['감정 관리·새로 알게 된 경제 개념은?', reflectData.q4]
+    ].map(function(x){
+      return '<div class="qa"><div class="q">'+escapeHtml(x[0])+'</div><div class="a">'+escapeHtml(x[1]||'').replace(/\n/g,'<br>')+'</div></div>';
+    }).join('');
+    var prs = [reflectData.p1, reflectData.p2, reflectData.p3].map(function(p,i){
+      return '<li>'+escapeHtml(p||'')+'</li>';
+    }).join('');
+    var imgs = (reflectData.files||[]).filter(function(f){ return (f.type||'').indexOf('image/')===0; })
+      .map(function(f){ return '<img src="'+f.dataUrl+'" style="max-width:100%;margin:6px 0;border:1px solid #ccc">'; }).join('');
+    var otherFiles = (reflectData.files||[]).filter(function(f){ return (f.type||'').indexOf('image/')!==0; })
+      .map(function(f){ return '<li>'+escapeHtml(f.name)+'</li>'; }).join('');
+    var html = '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>수업 성찰지</title>'+
+      '<style>body{font-family:"Malgun Gothic",sans-serif;padding:24px;color:#111;line-height:1.6}'+
+      'h1{font-size:21px;margin:0 0 4px}.sub{color:#666;font-size:13px;margin:0 0 18px}'+
+      'h2{font-size:15px;margin:18px 0 8px;border-bottom:2px solid #333;padding-bottom:4px}'+
+      '.qa{margin-bottom:12px}.q{font-weight:700;font-size:13px;margin-bottom:3px}'+
+      '.a{font-size:13px;border:1px solid #ccc;border-radius:6px;padding:8px 10px;min-height:34px;white-space:pre-wrap}'+
+      'ol{padding-left:22px}ol li{font-size:14px;margin-bottom:6px}'+
+      '@media print{@page{size:A4;margin:14mm}}</style></head><body>'+
+      '<h1>📔 쌈지 수업 성찰지</h1><p class="sub">'+(who?('이름/별명: '+escapeHtml(who)):'')+'</p>'+
+      '<h2>✍️ 돌아보기</h2>'+qa+
+      '<h2>💡 나만의 금융 원칙 3가지</h2><ol>'+prs+'</ol>'+
+      (imgs?('<h2>📎 첨부</h2>'+imgs):'')+
+      (otherFiles?('<h2>📎 첨부 파일</h2><ul>'+otherFiles+'</ul>'):'')+
+      '</body></html>';
     var w = window.open('', '_blank');
     if(!w){ toast('팝업이 차단되었어요. 팝업을 허용해 주세요.', 'warn'); return; }
     w.document.write(html); w.document.close();

@@ -452,6 +452,28 @@ a:hover { text-decoration: underline; }
 .nn-del { background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.5; padding: 2px; }
 .nn-del:hover { opacity: 1; }
 
+/* ------------------- 수업 성찰지 ------------------- */
+.rf-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.rf-hdr h2 { margin: 0; }
+.rf-actions { display: flex; gap: 8px; }
+.rf-intro { font-size: 13px; color: var(--text-2); line-height: 1.6; background: var(--brand-soft); border-radius: 10px; padding: 12px 14px; margin: 0 0 16px; }
+.rf-sec { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.rf-sec h3 { font-size: 15px; margin: 0 0 10px; }
+.rf-q { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
+.rf-q:last-child { margin-bottom: 0; }
+.rf-ta { width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-family: inherit; font-weight: 400; line-height: 1.55; resize: vertical; }
+.rf-principles { display: flex; flex-direction: column; gap: 10px; }
+.rf-pr { display: flex; align-items: center; gap: 10px; }
+.rf-prno { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.rf-pr input { flex: 1; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-family: inherit; }
+.rf-files { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.rf-file { position: relative; width: 96px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); }
+.rf-file img { width: 96px; height: 72px; object-fit: cover; display: block; }
+.rf-fileicon { width: 96px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 30px; background: #f1f5f9; }
+.rf-fname { display: block; font-size: 10px; color: var(--text-2); padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rf-fdel { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; cursor: pointer; line-height: 1; }
+.rf-fdel:hover { background: var(--up); }
+
 /* ------------------- Modal ------------------- */
 .modal-back {
   position: fixed;
