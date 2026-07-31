@@ -236,5 +236,8 @@ window.SSAMJI_MISSIONS = [
   { id:'m4', title:'거래 10회', desc:'매수·매도 합쳐 10회 이상 거래하기', reward:'📊 거래 숙련자', check:s=>s.trades.length>=10 },
   { id:'m5', title:'수익률 +10%', desc:'총 자산 수익률이 +10%를 넘기기', reward:'🚀 두 자릿수 수익', check:s=>((s.totalValue-s.seedMoney)/s.seedMoney)>=0.10 },
   { id:'m6', title:'1년 버티기', desc:'시뮬레이션 시간 365일 이상 진행하기', reward:'⏳ 장기 투자자', check:s=>s.daysPassed>=365 },
-  { id:'m7', title:'거래일지 5회', desc:'매매 시 근거를 5회 이상 기록하기', reward:'📝 기록의 힘', check:s=>s.trades.filter(t=>t.reason&&t.reason.length>=10).length>=5 }
+  { id:'m7', title:'거래일지 5회', desc:'매매 시 근거를 5회 이상 기록하기', reward:'📝 기록의 힘', check:s=>s.trades.filter(t=>t.reason&&t.reason.length>=10).length>=5 },
+  { id:'m8', title:'몰빵은 금물', desc:'종목을 사되 현금을 20% 이상 남겨두기', reward:'💵 현금 지킴이', check:s=>s.trades.some(t=>t.type==='buy') && s.totalValue>0 && (s.cash/s.totalValue)>=0.20 },
+  { id:'m9', title:'관심 종목 부자', desc:'서로 다른 5개 종목을 동시에 보유하기', reward:'🧺 분산 마스터', check:s=>{ let n=0; Object.keys(s.holdings||{}).forEach(t=>{ if(s.holdings[t].qty>0) n++; }); return n>=5; } },
+  { id:'m10', title:'뉴스 탐정', desc:'오늘의 뉴스에서 이슈 기록지 3건 이상 쓰기', reward:'🔎 뉴스 탐정', check:s=>{ try{ return window.SSAMJI_NEWS && SSAMJI_NEWS.getNotes().length>=3; }catch(e){ return false; } } }
 ];
