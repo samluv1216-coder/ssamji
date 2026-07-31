@@ -883,6 +883,34 @@
     on($('rfFileBtn'), 'click', function(){ $('rfFile').click(); });
     on($('rfFile'), 'change', function(){ handleReflectFiles(this.files); this.value=''; });
     on($('rfSubmit'), 'click', submitToTeacher);
+    on($('rfRestore'), 'click', restoreFromDevice);
+  }
+  // 다른 기기에서 하던 기록을 이 기기로 불러오기
+  async function restoreFromDevice(){
+    if(!SSAMJI_GROUP.getState().code){ toast('먼저 학급에 참가해 주세요.', 'warn'); $('groupGate').hidden = false; return; }
+    var s = SSAMJI_PORT.summary();
+    if(s.trades && s.trades.length > 0){
+      if(!confirm('이 기기에 이미 거래 기록('+s.trades.length+'건)이 있어요.\n불러오면 이 기기의 현재 기록이 이전 제출본으로 대체됩니다. 계속할까요?')) return;
+    }
+    var btn = $('rfRestore'); var old = btn.textContent; btn.disabled = true; btn.textContent = '불러오는 중…';
+    try{
+      await SSAMJI_GROUP.ensureGoogleIdentity();       // 구글 로그인 → 같은 계정의 제출본 접근
+      var sub = await SSAMJI_GROUP.getMySubmission();
+      if(!sub || !sub.restore || !sub.restore.portfolio){
+        toast('이 구글 계정으로 이전에 제출한 기록이 없어요.', 'warn'); return;
+      }
+      var r = sub.restore;
+      var pf = null; try{ pf = JSON.parse(r.portfolio||'null'); }catch(e){}
+      var tn = (pf && pf.trades) ? pf.trades.length : 0;
+      if(!confirm('구글 계정 '+(sub.email||'')+'의 이전 기록을 이 기기로 불러올까요?\n거래 '+tn+'건·기록지·성찰이 복원됩니다.')) return;
+      if(r.portfolio) localStorage.setItem('ssamji_portfolio_v1', r.portfolio);
+      if(r.clock)     localStorage.setItem('ssamji_clock_v1', r.clock);
+      if(r.news)      localStorage.setItem('ssamji_news_notes_v1', r.news);
+      if(r.reflect)   localStorage.setItem('ssamji_reflect_v1', r.reflect);
+      toast('✅ 불러왔어요! 잠시 후 새로고침합니다.', 'ok');
+      setTimeout(function(){ location.reload(); }, 900);
+    }catch(e){ toast('❌ ' + e.message, 'err'); }
+    finally{ btn.disabled = false; btn.textContent = old; }
   }
   function renderReflect(){
     loadReflect();
@@ -912,6 +940,18 @@
     var badges = SSAMJI_MISSIONS.filter(function(m){ try{ return m.check(s); }catch(e){ return false; } })
       .map(function(m){ return { title:m.title, reward:m.reward }; });
     var notes = SSAMJI_NEWS.getNotes();
+    // 다른 기기에서 이어하기용 원본 localStorage 스냅샷 (첨부 이미지는 용량상 제외)
+    var reflectRaw = '';
+    try{
+      var rd = JSON.parse(localStorage.getItem('ssamji_reflect_v1') || 'null');
+      if(rd){ var rd2 = Object.assign({}, rd); delete rd2.files; reflectRaw = JSON.stringify(rd2); }
+    }catch(e){}
+    var restore = {
+      portfolio: localStorage.getItem('ssamji_portfolio_v1') || '',
+      clock: localStorage.getItem('ssamji_clock_v1') || '',
+      news: localStorage.getItem('ssamji_news_notes_v1') || '',
+      reflect: reflectRaw
+    };
     return {
       summary: {
         totalValue:s.totalValue, cash:s.cash, returnPct:s.returnPct, seedMoney:s.seedMoney,
@@ -926,7 +966,8 @@
       notes: notes,
       reflection: { q1:reflectData.q1||'', q2:reflectData.q2||'', q3:reflectData.q3||'', q4:reflectData.q4||'',
                     p1:reflectData.p1||'', p2:reflectData.p2||'', p3:reflectData.p3||'' },
-      badges: badges
+      badges: badges,
+      restore: restore
     };
   }
   async function submitToTeacher(){

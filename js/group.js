@@ -214,6 +214,19 @@
       throw new Error('이 학급은 «@'+dom+'» 계정만 제출할 수 있어요. 학교 계정으로 다시 시도해 주세요.');
     }
     var uid = user.uid;
+    // 빈 기기에서 실수 제출 → 이전 기록 덮어쓰기 방지 가드
+    try{
+      var exSnap = await subCol().doc(uid).get();
+      if(exSnap.exists){
+        var ex = exSnap.data() || {};
+        var newT = (bundle.trades||[]).length;
+        var oldT = ex.trades ? ex.trades.length : 0;
+        if(newT === 0 && oldT > 0){
+          throw new Error('이 기기엔 거래 기록이 없어요. 먼저 「다른 기기에서 이어하기」로 이전 기록을 불러온 뒤 제출해 주세요. (그냥 제출하면 이전 기록이 지워질 수 있어요)');
+        }
+      }
+    }catch(e){ if(e && e.message && e.message.indexOf('이 기기엔')===0) throw e; /* 조회 실패는 무시 */ }
+
     var doc = Object.assign({}, bundle, {
       name: user.displayName || bundle.nickname || '이름없음',
       email: user.email || '',
