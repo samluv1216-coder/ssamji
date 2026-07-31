@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>쌈지(SSAMJI) — 투자도 경제도, 쌈지에 담다</title>
-  <link rel="stylesheet" href="css/styles.css?v=7">
+  <link rel="stylesheet" href="css/styles.css?v=8">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📈%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -68,6 +68,7 @@
   <button class="tab" data-tab="learn">🎓 학습</button>
   <button class="tab" data-tab="reflect">📔 성찰</button>
   <button class="tab" data-tab="rank">🏆 학급 랭킹</button>
+  <button class="tab" data-tab="grade" id="tabGrade" hidden>🧑‍🏫 채점</button>
 </nav>
 
 <!-- 시장 뷰 -->
@@ -223,6 +224,17 @@
     <span class="nw-sub" id="rfFileHint"> 사진은 자동으로 줄여서 저장돼요 · 파일당 2MB 이하 · 최대 5개</span>
     <div id="rfFiles" class="rf-files"></div>
   </section>
+
+  <section class="rf-sec rf-submit-sec">
+    <h3>📤 선생님께 제출 (전체 과정)</h3>
+    <p class="nw-sub">구글 로그인을 하면 그동안의 <b>거래 내역·매매 근거·오늘의 뉴스 기록지·획득 배지·투자 성과</b>와
+      이 성찰지가 <b>한꺼번에</b> 선생님께 제출돼요. 여러 번 눌러도 되고, 그때마다 최신 내용으로 갱신됩니다.</p>
+    <div class="rf-submit-row">
+      <button class="btn-primary" id="rfSubmit">📤 구글 로그인하고 제출</button>
+      <span id="rfSubmitStatus" class="rf-submit-status"></span>
+    </div>
+    <div id="rfEvalBox" class="rf-evalbox" hidden></div>
+  </section>
 </main>
 
 <!-- 랭킹 뷰 -->
@@ -234,6 +246,22 @@
   <div id="rkStatus" class="rk-status"></div>
   <div id="rkTeacher" class="rk-teacher" hidden></div>
   <div id="rkList" class="rk-list"></div>
+</main>
+
+<!-- 교사 채점 대시보드 (admin 전용) -->
+<main class="view" id="view-grade">
+  <div class="gr-hdr">
+    <h2>🧑‍🏫 채점 대시보드</h2>
+    <div class="gr-actions">
+      <button class="btn-plain sm" id="grDomainBtn">🔒 제출 도메인</button>
+      <button class="btn-plain sm" id="grPrintAll">🖨️ 전체 점수표</button>
+    </div>
+  </div>
+  <p class="nw-sub" id="grHint">학생이 「제출」하면 여기에 실시간으로 올라와요. 학생을 골라 과정을 확인하고 채점하세요.</p>
+  <div class="gr-layout">
+    <div class="gr-list" id="grList"></div>
+    <div class="gr-detail" id="grDetail"><div class="gr-empty">왼쪽 목록에서 학생을 선택하세요.</div></div>
+  </div>
 </main>
 
 <!-- 종목 상세 모달 -->
@@ -306,6 +334,7 @@
       <label>학급명 <input id="gcName" maxlength="30" placeholder="예) 모가중 2-3반 경제탐구"></label>
       <label>내 이름·별명 <input id="gcNick" maxlength="20" placeholder="예) 선생님"></label>
       <label>교사 PIN (4자리 이상, 선택) <input id="gcPin" type="password" inputmode="numeric" maxlength="12" placeholder="다른 기기에서 교사 로그인에 사용"></label>
+      <label>제출 허용 도메인 (선택) <input id="gcDomain" maxlength="60" placeholder="예) moga.ms.kr — 학교 계정만 제출 가능"></label>
       <button class="btn-primary" id="btnGrpCreate">학급 만들기</button>
       <p class="grp-hint">PIN을 정해 두면 다른 기기·다른 브라우저에서도 「교사 로그인」으로 교사 기능을 쓸 수 있어요.</p>
     </div>
@@ -339,12 +368,12 @@
 <script src="js/clock.js?v=1"></script>
 <script src="js/portfolio.js?v=1"></script>
 <script src="js/chart.js?v=1"></script>
-<script defer src="js/firebase-config.js?v=1"></script>
-<script defer src="js/group.js?v=3"></script>
+<script defer src="js/firebase-config.js?v=2"></script>
+<script defer src="js/group.js?v=4"></script>
 <script defer src="js/ranking.js?v=2"></script>
 <script src="js/ai.js?v=1"></script>
 <script src="js/news.js?v=1"></script>
-<script defer src="js/app.js?v=7"></script>
+<script defer src="js/app.js?v=8"></script>
 
 </body>
 </html>

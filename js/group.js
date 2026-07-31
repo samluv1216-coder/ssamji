@@ -36,7 +36,7 @@
   }
 
   // 그룹 생성 — Firestore에 신규 문서 만들고 초대 코드 발급
-  async function createGroup(className, nickname, pin){
+  async function createGroup(className, nickname, pin, submitDomain){
     if(!SSAMJI_FB_READY) throw new Error('Firebase 인증이 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.');
     var db = SSAMJI_FB_DB;
     // 겹치지 않는 코드 만들기 (최대 5회 재시도)
@@ -54,6 +54,7 @@
       memberCount: 1
     };
     if(pin){ groupDoc.teacherPinHash = await sha256(String(pin)); }
+    if(submitDomain){ groupDoc.submitDomain = String(submitDomain).toLowerCase().replace(/^@/,'').trim(); }
     await db.collection('ssamji_groups').doc(code).set(groupDoc);
     // 본인 멤버 등록
     await db.collection('ssamji_groups').doc(code)
@@ -168,6 +169,110 @@
     return uids.length;
   }
 
+  // ──────────── 제출·채점 (과정평가) ────────────
+  function emailDomain(email){ var i=(email||'').indexOf('@'); return i>=0 ? email.slice(i+1).toLowerCase() : ''; }
+
+  // 익명 계정에 구글 신원 연결(linkWithPopup) — 같은 UID 유지해 그동안의 데이터 보존
+  async function ensureGoogleIdentity(){
+    if(!window.firebase) throw new Error('로그인 기능을 쓸 수 없어요.');
+    var user = firebase.auth().currentUser;
+    if(!user) throw new Error('로그인 준비 중이에요. 잠시 후 다시 시도해 주세요.');
+    if(!user.isAnonymous && user.email) return user;   // 이미 구글 로그인됨
+    var provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt:'select_account' });
+    try{
+      var res = await user.linkWithPopup(provider);
+      return res.user;
+    }catch(e){
+      // 이 구글 계정이 다른 익명계정에 이미 연결됨 → 그 계정으로 로그인 전환
+      if(e.code==='auth/credential-already-in-use' || e.code==='auth/email-already-in-use'){
+        var cred = e.credential ||
+          (firebase.auth.GoogleAuthProvider.credentialFromError && firebase.auth.GoogleAuthProvider.credentialFromError(e));
+        if(cred){ var r2 = await firebase.auth().signInWithCredential(cred); return r2.user; }
+      }
+      if(e.code==='auth/popup-blocked') throw new Error('팝업이 차단됐어요. 브라우저에서 팝업을 허용한 뒤 다시 시도해 주세요.');
+      if(e.code==='auth/popup-closed-by-user' || e.code==='auth/cancelled-popup-request') throw new Error('로그인 창이 닫혔어요. 다시 시도해 주세요.');
+      throw new Error('구글 로그인 실패: ' + (e.message || e.code));
+    }
+  }
+
+  async function fetchGroupDoc(){
+    var snap = await SSAMJI_FB_DB.collection('ssamji_groups').doc(state.code).get();
+    return snap.exists ? snap.data() : null;
+  }
+  function subCol(){ return SSAMJI_FB_DB.collection('ssamji_groups').doc(state.code).collection('submissions'); }
+
+  // 학생 제출 — 전체 과정 번들(bundle) + 첨부파일(files). 재제출 시 덮어씀(교사 평가는 보존)
+  async function submitWork(bundle, files){
+    if(!state.code) throw new Error('먼저 학급에 참가해 주세요.');
+    var user = await ensureGoogleIdentity();
+    // 학급 제출 도메인 제한 확인
+    var g = await fetchGroupDoc();
+    var dom = (g && g.submitDomain) ? String(g.submitDomain).toLowerCase() : '';
+    if(dom && emailDomain(user.email) !== dom){
+      try{ await user.unlink('google.com'); }catch(e){}   // 되돌려 다른 계정으로 재시도 가능하게
+      throw new Error('이 학급은 «@'+dom+'» 계정만 제출할 수 있어요. 학교 계정으로 다시 시도해 주세요.');
+    }
+    var uid = user.uid;
+    var doc = Object.assign({}, bundle, {
+      name: user.displayName || bundle.nickname || '이름없음',
+      email: user.email || '',
+      nickname: state.myNickname || bundle.nickname || '',
+      submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      fileCount: (files||[]).length
+    });
+    try{
+      await subCol().doc(uid).set(doc, { merge:true });   // merge → eval 보존
+      // 첨부: 기존 파일 지우고 새로 저장 (각 문서 1MB 미만)
+      var fcol = subCol().doc(uid).collection('files');
+      try{
+        var old = await fcol.get();
+        await Promise.all(old.docs.map(function(d){ return d.ref.delete(); }));
+      }catch(e){}
+      for(var i=0;i<(files||[]).length;i++){
+        await fcol.doc('f'+i).set({ name:files[i].name, type:files[i].type, dataUrl:files[i].dataUrl });
+      }
+    }catch(e){
+      if(e.code === 'permission-denied'){
+        throw new Error('아직 제출 기능이 열리지 않았어요. 선생님께 «제출 기능(Firestore 규칙)»을 켜달라고 알려주세요.');
+      }
+      throw e;
+    }
+    return { uid: uid, name: doc.name, email: doc.email };
+  }
+
+  async function getMySubmission(){
+    if(!SSAMJI_FB_READY || !state.code || !SSAMJI_FB_UID) return null;
+    var snap = await subCol().doc(SSAMJI_FB_UID).get();
+    return snap.exists ? snap.data() : null;
+  }
+
+  // ── 교사용 ──
+  function subscribeSubmissions(cb){
+    if(!SSAMJI_FB_READY || !state.code) return function(){};
+    return subCol().onSnapshot(function(snap){
+      var arr = [];
+      snap.forEach(function(d){ arr.push(Object.assign({ uid:d.id }, d.data())); });
+      cb(arr);
+    }, function(e){ console.warn('[SSAMJI] 제출 구독 오류:', e.message); });
+  }
+  async function getSubmissionFiles(uid){
+    try{
+      var snap = await subCol().doc(uid).collection('files').get();
+      return snap.docs.map(function(d){ return d.data(); });
+    }catch(e){ return []; }
+  }
+  async function saveEval(uid, ev){
+    if(!isAdmin()) throw new Error('교사만 채점할 수 있어요.');
+    await subCol().doc(uid).set({ eval: ev }, { merge:true });
+  }
+  async function setSubmitDomain(dom){
+    if(!isAdmin()) throw new Error('교사만 설정할 수 있어요.');
+    await SSAMJI_FB_DB.collection('ssamji_groups').doc(state.code)
+      .set({ submitDomain: (dom||'').toLowerCase().replace(/^@/,'').trim() }, { merge:true });
+  }
+  async function getSubmitDomain(){ var g = await fetchGroupDoc(); return (g && g.submitDomain) || ''; }
+
   window.SSAMJI_GROUP = {
     load: load,
     save: save,
@@ -180,6 +285,14 @@
     requestReset: requestReset,
     teacherLogin: teacherLogin,
     setTeacherPin: setTeacherPin,
+    ensureGoogleIdentity: ensureGoogleIdentity,
+    submitWork: submitWork,
+    getMySubmission: getMySubmission,
+    subscribeSubmissions: subscribeSubmissions,
+    getSubmissionFiles: getSubmissionFiles,
+    saveEval: saveEval,
+    setSubmitDomain: setSubmitDomain,
+    getSubmitDomain: getSubmitDomain,
     getState: function(){ return state; }
   };
 })();

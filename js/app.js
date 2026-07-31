@@ -78,9 +78,17 @@
           if(SSAMJI_GROUP.getState().code){
             SSAMJI_RANK.subscribe();
           }
+          updateAdminUI();
+          if(state.activeTab === 'reflect') refreshSubmitStatus();
+        });
+        // 로그인 상태 바뀌면(구글 연결 등) 제출 상태·교사탭 갱신
+        document.addEventListener('ssamji:auth-changed', function(){
+          updateAdminUI();
+          if(state.activeTab === 'reflect') refreshSubmitStatus();
         });
       }
     }, 100);
+    updateAdminUI();
   }
   document.addEventListener('DOMContentLoaded', init);
 
@@ -99,6 +107,7 @@
         if(name === 'learn') renderLearn();
         if(name === 'reflect') renderReflect();
         if(name === 'rank') renderRanking();
+        if(name === 'grade') renderGrade();
       });
     });
   }
@@ -542,7 +551,7 @@
       if(confirm('학급을 나가시겠어요? 랭킹에서 삭제됩니다.')){
         SSAMJI_GROUP.leaveGroup();
         SSAMJI_RANK.unsubscribe();
-        renderRanking();
+        renderRanking(); updateAdminUI();
       }
     });
     if(!SSAMJI_FB_READY){
@@ -873,6 +882,7 @@
     on($('rfPrint'), 'click', printReflect);
     on($('rfFileBtn'), 'click', function(){ $('rfFile').click(); });
     on($('rfFile'), 'change', function(){ handleReflectFiles(this.files); this.value=''; });
+    on($('rfSubmit'), 'click', submitToTeacher);
   }
   function renderReflect(){
     loadReflect();
@@ -880,6 +890,77 @@
     $('rfQ3').value = reflectData.q3||''; $('rfQ4').value = reflectData.q4||'';
     $('rfP1').value = reflectData.p1||''; $('rfP2').value = reflectData.p2||''; $('rfP3').value = reflectData.p3||'';
     renderReflectFiles();
+    refreshSubmitStatus();
+  }
+
+  // ── 전체 과정 제출 ──
+  function buildSubmissionBundle(){
+    // 성찰 입력 최신값 반영
+    RF_FIELDS.forEach(function(id){ if($(id)) reflectData[id.slice(2).toLowerCase()] = $(id).value; });
+    var s = SSAMJI_PORT.summary();
+    var nameOf = function(tk){ var st = SSAMJI_STOCKS.find(function(x){return x.ticker===tk;}); return st?st.name:tk; };
+    var catOf = function(tk){ var st = SSAMJI_STOCKS.find(function(x){return x.ticker===tk;}); return st?st.category:''; };
+    var trades = (s.trades||[]).map(function(t){
+      return { type:t.type, ticker:t.ticker, name:nameOf(t.ticker), qty:t.qty, price:t.price,
+               date:t.date, reason:t.reason||'', realizedPnl:t.realizedPnl||0 };
+    });
+    var holdings = Object.keys(s.holdings||{}).map(function(tk){
+      var h=s.holdings[tk]; return { ticker:tk, name:nameOf(tk), qty:h.qty, avgPrice:h.avgPrice };
+    }).filter(function(h){ return h.qty>0; });
+    var reasoned = trades.filter(function(t){ return t.reason && t.reason.length>=5; }).length;
+    var sectors = {}; holdings.forEach(function(h){ var c=catOf(h.ticker); if(c) sectors[c]=1; });
+    var badges = SSAMJI_MISSIONS.filter(function(m){ try{ return m.check(s); }catch(e){ return false; } })
+      .map(function(m){ return { title:m.title, reward:m.reward }; });
+    var notes = SSAMJI_NEWS.getNotes();
+    return {
+      summary: {
+        totalValue:s.totalValue, cash:s.cash, returnPct:s.returnPct, seedMoney:s.seedMoney,
+        daysPassed:s.daysPassed, currentDate:s.currentDate,
+        tradeCount:trades.length, reasonedCount:reasoned, sectorCount:Object.keys(sectors).length,
+        buyCount:trades.filter(function(t){return t.type==='buy';}).length,
+        sellCount:trades.filter(function(t){return t.type==='sell';}).length,
+        noteCount:notes.length, badgeCount:badges.length
+      },
+      holdings: holdings,
+      trades: trades.slice(0, 500),   // 안전상 최대 500건
+      notes: notes,
+      reflection: { q1:reflectData.q1||'', q2:reflectData.q2||'', q3:reflectData.q3||'', q4:reflectData.q4||'',
+                    p1:reflectData.p1||'', p2:reflectData.p2||'', p3:reflectData.p3||'' },
+      badges: badges
+    };
+  }
+  async function submitToTeacher(){
+    if(!SSAMJI_GROUP.getState().code){
+      toast('먼저 학급에 참가해 주세요.', 'warn'); $('groupGate').hidden = false; return;
+    }
+    var btn = $('rfSubmit'); var old = btn.textContent;
+    btn.disabled = true; btn.textContent = '제출 중…';
+    try{
+      var bundle = buildSubmissionBundle();
+      var r = await SSAMJI_GROUP.submitWork(bundle, reflectData.files || []);
+      toast('✅ 제출 완료! (' + r.name + ')', 'ok');
+      refreshSubmitStatus();
+    }catch(e){ toast('❌ ' + e.message, 'err'); }
+    finally{ btn.disabled = false; btn.textContent = old; }
+  }
+  function refreshSubmitStatus(){
+    var st = $('rfSubmitStatus'), ev = $('rfEvalBox');
+    if(!st) return;
+    if(!SSAMJI_GROUP.getState().code){ st.textContent = '학급에 참가하면 제출할 수 있어요.'; if(ev) ev.hidden = true; return; }
+    st.textContent = '확인 중…';
+    SSAMJI_GROUP.getMySubmission().then(function(sub){
+      if(!sub){ st.textContent = '아직 제출하지 않았어요.'; if(ev) ev.hidden = true; return; }
+      st.innerHTML = '✅ 제출됨' + (sub.name?(' · <b>'+escapeHtml(sub.name)+'</b>'):'');
+      // 교사 평가가 있으면 학생에게도 보여줌
+      if(ev){
+        if(sub.eval && (typeof sub.eval.total==='number' || sub.eval.comment)){
+          ev.hidden = false;
+          ev.innerHTML = '<div class="rf-eval-h">🧑‍🏫 선생님 평가</div>' +
+            (typeof sub.eval.total==='number' ? '<div class="rf-eval-score">'+sub.eval.total+'점</div>' : '') +
+            (sub.eval.comment ? '<p class="rf-eval-cmt">'+escapeHtml(sub.eval.comment)+'</p>' : '');
+        } else { ev.hidden = true; }
+      }
+    }).catch(function(){ st.textContent = ''; });
   }
   function handleReflectFiles(fileList){
     var files = Array.prototype.slice.call(fileList||[]);
@@ -979,6 +1060,211 @@
     w.onload = function(){ w.focus(); w.print(); };
   }
 
+  // ---------------- 교사 채점 대시보드 ----------------
+  var RUBRIC = [
+    { key:'r1', label:'매매 근거의 질', desc:'왜 샀는지 근거를 충실·타당하게 기록했는가' },
+    { key:'r2', label:'자원 배분·위험 관리', desc:'분산투자·위험 관리를 실천했는가' },
+    { key:'r3', label:'이슈 탐구·기록', desc:'오늘의 뉴스 이슈를 성실히 찾아 기록했는가' },
+    { key:'r4', label:'성찰의 깊이', desc:'성찰지·금융원칙에 배움과 태도가 드러나는가' }
+  ];
+  var GR_SUBS = [];        // 현재 제출 목록
+  var grUnsub = null;      // 구독 해제 함수
+  var grSelUid = null;     // 선택된 학생
+
+  function updateAdminUI(){
+    var admin = SSAMJI_GROUP.isAdmin();
+    var tg = $('tabGrade'); if(tg) tg.hidden = !admin;
+    if(!admin && state.activeTab === 'grade'){
+      state.activeTab = 'market';
+      document.querySelector('[data-tab="market"]').click();
+    }
+  }
+
+  function renderGrade(){
+    if(!SSAMJI_GROUP.isAdmin()){ toast('교사만 볼 수 있어요.', 'warn'); return; }
+    if(!grUnsub && SSAMJI_FB_READY){
+      grUnsub = SSAMJI_GROUP.subscribeSubmissions(function(list){
+        GR_SUBS = list.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||'', 'ko'); });
+        renderGradeList();
+        if(grSelUid){ var s = GR_SUBS.find(function(x){return x.uid===grSelUid;}); if(s) renderGradeDetail(s); }
+      });
+    }
+    on($('grDomainBtn'), 'click', editSubmitDomain);
+    on($('grPrintAll'), 'click', printAllScores);
+    renderGradeList();
+  }
+  function renderGradeList(){
+    var box = $('grList'); if(!box) return;
+    $('grHint').textContent = GR_SUBS.length
+      ? ('제출 '+GR_SUBS.length+'명 · 채점 완료 '+GR_SUBS.filter(function(s){return s.eval&&typeof s.eval.total==='number';}).length+'명')
+      : '아직 제출한 학생이 없어요. 학생이 「제출」하면 실시간으로 올라옵니다.';
+    if(!GR_SUBS.length){ box.innerHTML = '<div class="gr-empty">제출 대기 중…</div>'; return; }
+    box.innerHTML = GR_SUBS.map(function(s){
+      var graded = s.eval && typeof s.eval.total==='number';
+      return '<button class="gr-item'+(s.uid===grSelUid?' on':'')+'" data-uid="'+s.uid+'">' +
+        '<div class="gr-item-name">'+escapeHtml(s.name||'이름없음')+'</div>' +
+        '<div class="gr-item-sub">'+escapeHtml(s.nickname||'')+' · 수익률 '+fmtPct(s.summary?s.summary.returnPct:0)+'</div>' +
+        (graded?'<span class="gr-badge done">'+s.eval.total+'점</span>':'<span class="gr-badge">미채점</span>') +
+      '</button>';
+    }).join('');
+    box.querySelectorAll('.gr-item').forEach(function(b){
+      on(b, 'click', function(){
+        grSelUid = b.getAttribute('data-uid');
+        renderGradeList();
+        var s = GR_SUBS.find(function(x){return x.uid===grSelUid;});
+        if(s) renderGradeDetail(s);
+      });
+    });
+  }
+  function metricRow(sm){
+    if(!sm) return '';
+    var pct = sm.tradeCount ? Math.round(sm.reasonedCount/sm.tradeCount*100) : 0;
+    return '<div class="gr-metrics">' +
+      '<div class="gr-m"><span>수익률</span><b class="'+upDown(sm.returnPct)+'">'+fmtPct(sm.returnPct)+'</b></div>' +
+      '<div class="gr-m"><span>총자산</span><b>'+fmt(sm.totalValue)+'원</b></div>' +
+      '<div class="gr-m"><span>거래</span><b>'+sm.tradeCount+'회</b></div>' +
+      '<div class="gr-m"><span>근거 작성</span><b>'+sm.reasonedCount+'/'+sm.tradeCount+' ('+pct+'%)</b></div>' +
+      '<div class="gr-m"><span>분산 업종</span><b>'+sm.sectorCount+'개</b></div>' +
+      '<div class="gr-m"><span>경과일</span><b>'+sm.daysPassed+'일</b></div>' +
+      '<div class="gr-m"><span>기록지</span><b>'+(sm.noteCount||0)+'건</b></div>' +
+      '<div class="gr-m"><span>배지</span><b>'+(sm.badgeCount||0)+'개</b></div>' +
+    '</div>';
+  }
+  function renderGradeDetail(s){
+    var box = $('grDetail'); if(!box) return;
+    var ev = s.eval || {};
+    var trades = (s.trades||[]).map(function(t){
+      return '<tr><td>'+escapeHtml(t.date||'')+'</td><td>'+(t.type==='buy'?'매수':'매도')+'</td>' +
+        '<td>'+escapeHtml(t.name||'')+'</td><td class="num">'+t.qty+'</td>' +
+        '<td class="rsn">'+escapeHtml(t.reason||'—')+'</td></tr>';
+    }).join('');
+    var holds = (s.holdings||[]).map(function(h){ return '<span class="gr-chip">'+escapeHtml(h.name)+' '+h.qty+'주</span>'; }).join('') || '<span class="nw-sub">보유 없음</span>';
+    var notes = (s.notes||[]).map(function(n){
+      return '<li>['+escapeHtml(n.date||'')+'] '+escapeHtml(n.text||'')+(n.stockName?(' <b>('+escapeHtml(n.stockName)+')</b>'):'')+'</li>';
+    }).join('') || '<li class="nw-sub">기록 없음</li>';
+    var badges = (s.badges||[]).map(function(b){ return '<span class="gr-chip">'+escapeHtml(b.reward||b.title)+'</span>'; }).join('') || '<span class="nw-sub">없음</span>';
+    var rf = s.reflection || {};
+    var rfHtml = [
+      ['가장 기억에 남는 순간', rf.q1], ['잘한 점', rf.q2], ['아쉬운 점·다짐', rf.q3], ['감정 관리·배운 개념', rf.q4]
+    ].map(function(x){ return '<div class="gr-qa"><div class="gr-q">'+x[0]+'</div><div class="gr-a">'+escapeHtml(x[1]||'—')+'</div></div>'; }).join('');
+    var prin = [rf.p1,rf.p2,rf.p3].filter(function(p){return p;}).map(function(p){ return '<li>'+escapeHtml(p)+'</li>'; }).join('') || '<li class="nw-sub">없음</li>';
+
+    var rubricInputs = RUBRIC.map(function(r){
+      var v = (ev.rubric && typeof ev.rubric[r.key]==='number') ? ev.rubric[r.key] : '';
+      return '<div class="gr-rub"><div class="gr-rub-l"><b>'+r.label+'</b><span>'+r.desc+'</span></div>' +
+        '<input type="number" min="0" max="25" class="gr-rub-in" data-key="'+r.key+'" value="'+v+'"><span class="gr-rub-max">/25</span></div>';
+    }).join('');
+
+    box.innerHTML =
+      '<div class="gr-d-hdr"><div><h3>'+escapeHtml(s.name||'이름없음')+'</h3>' +
+        '<div class="nw-sub">'+escapeHtml(s.email||'')+' · 별명 '+escapeHtml(s.nickname||'')+'</div></div>' +
+        '<button class="btn-plain sm" id="grPrintOne">🖨️ 리포트</button></div>' +
+      metricRow(s.summary) +
+      '<div class="gr-sec"><h4>💼 보유 종목</h4><div class="gr-chips">'+holds+'</div></div>' +
+      '<div class="gr-sec"><h4>🏅 획득 배지</h4><div class="gr-chips">'+badges+'</div></div>' +
+      '<div class="gr-sec"><h4>📓 거래 내역·근거 ('+(s.trades?s.trades.length:0)+'건)</h4>' +
+        (trades ? '<div class="gr-tablewrap"><table class="gr-table"><thead><tr><th>날짜</th><th>구분</th><th>종목</th><th>수량</th><th>근거</th></tr></thead><tbody>'+trades+'</tbody></table></div>' : '<p class="nw-sub">거래 없음</p>') + '</div>' +
+      '<div class="gr-sec"><h4>📰 이슈 기록지</h4><ul class="gr-notes">'+notes+'</ul></div>' +
+      '<div class="gr-sec"><h4>📔 성찰</h4>'+rfHtml+'<div class="gr-q" style="margin-top:8px">나만의 금융 원칙</div><ol class="gr-prin">'+prin+'</ol></div>' +
+      '<div class="gr-sec gr-attach" id="grAttach"><h4>📎 첨부</h4><span class="nw-sub">불러오는 중…</span></div>' +
+      '<div class="gr-grade">' +
+        '<h4>✍️ 채점 (항목별 25점 · 합계 100점)</h4>' + rubricInputs +
+        '<div class="gr-total">합계 <b id="grTotal">0</b> / 100</div>' +
+        '<textarea id="grComment" class="gr-comment" rows="3" placeholder="학생에게 전할 코멘트를 적어주세요">'+escapeHtml(ev.comment||'')+'</textarea>' +
+        '<button class="btn-primary" id="grSave">💾 채점 저장</button>' +
+        (ev.gradedAt?'<span class="nw-sub gr-graded"> 채점됨</span>':'') +
+      '</div>';
+
+    // 합계 자동 계산
+    function recalc(){
+      var t=0; box.querySelectorAll('.gr-rub-in').forEach(function(i){ var v=parseInt(i.value,10); if(!isNaN(v)) t+=v; });
+      $('grTotal').textContent = t;
+    }
+    box.querySelectorAll('.gr-rub-in').forEach(function(i){ on(i,'input',recalc); });
+    recalc();
+    on($('grSave'), 'click', function(){
+      var rubric={}, total=0;
+      box.querySelectorAll('.gr-rub-in').forEach(function(i){ var v=parseInt(i.value,10); if(isNaN(v))v=0; v=Math.max(0,Math.min(25,v)); rubric[i.getAttribute('data-key')]=v; total+=v; });
+      var ev2 = { rubric:rubric, total:total, comment:$('grComment').value.trim(), gradedAt: new Date().toISOString().slice(0,10) };
+      SSAMJI_GROUP.saveEval(s.uid, ev2).then(function(){
+        s.eval = ev2; toast('💾 채점 저장 완료 ('+total+'점)', 'ok'); renderGradeList();
+      }).catch(function(e){ toast('저장 실패: '+e.message, 'err'); });
+    });
+    on($('grPrintOne'), 'click', function(){ printStudentReport(s); });
+
+    // 첨부 파일 로드
+    if(s.fileCount){
+      SSAMJI_GROUP.getSubmissionFiles(s.uid).then(function(files){
+        var el = $('grAttach'); if(!el) return;
+        var imgs = files.map(function(f){
+          return (f.type||'').indexOf('image/')===0
+            ? '<a href="'+f.dataUrl+'" target="_blank" rel="noopener"><img class="gr-thumb" src="'+f.dataUrl+'" alt=""></a>'
+            : '<span class="gr-chip">📄 '+escapeHtml(f.name)+'</span>';
+        }).join('');
+        el.innerHTML = '<h4>📎 첨부 ('+files.length+')</h4><div class="gr-chips">'+(imgs||'<span class="nw-sub">없음</span>')+'</div>';
+      });
+    } else {
+      var el=$('grAttach'); if(el) el.innerHTML = '<h4>📎 첨부</h4><span class="nw-sub">없음</span>';
+    }
+  }
+  function editSubmitDomain(){
+    SSAMJI_GROUP.getSubmitDomain().then(function(cur){
+      var v = prompt('제출 허용 이메일 도메인을 입력하세요.\n예) moga.ms.kr — 이 도메인 계정만 제출 가능.\n비워두면 모든 구글 계정 허용.', cur||'');
+      if(v===null) return;
+      SSAMJI_GROUP.setSubmitDomain(v.trim()).then(function(){
+        toast(v.trim()?('제출 도메인: @'+v.trim().replace(/^@/,'')):'도메인 제한 해제', 'ok');
+      }).catch(function(e){ toast(e.message, 'err'); });
+    });
+  }
+  function printStudentReport(s){
+    var sm = s.summary||{}, ev = s.eval||{}, rf = s.reflection||{};
+    var rubRows = RUBRIC.map(function(r){ var v=(ev.rubric&&typeof ev.rubric[r.key]==='number')?ev.rubric[r.key]:'—'; return '<tr><td>'+r.label+'</td><td>'+r.desc+'</td><td style="text-align:center">'+v+' / 25</td></tr>'; }).join('');
+    var trades = (s.trades||[]).map(function(t){ return '<tr><td>'+escapeHtml(t.date||'')+'</td><td>'+(t.type==='buy'?'매수':'매도')+'</td><td>'+escapeHtml(t.name||'')+'</td><td style="text-align:center">'+t.qty+'</td><td>'+escapeHtml(t.reason||'—')+'</td></tr>'; }).join('');
+    var notes = (s.notes||[]).map(function(n){ return '<li>['+escapeHtml(n.date||'')+'] '+escapeHtml(n.text||'')+(n.stockName?(' ('+escapeHtml(n.stockName)+')'):'')+'</li>'; }).join('');
+    var prin = [rf.p1,rf.p2,rf.p3].filter(Boolean).map(function(p){return '<li>'+escapeHtml(p)+'</li>';}).join('');
+    var qa = [['가장 기억에 남는 순간',rf.q1],['잘한 점',rf.q2],['아쉬운 점·다짐',rf.q3],['감정 관리·배운 개념',rf.q4]]
+      .map(function(x){return '<div class="qa"><div class="q">'+x[0]+'</div><div class="a">'+escapeHtml(x[1]||'—')+'</div></div>';}).join('');
+    var html = '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>'+escapeHtml(s.name||'')+' 과정평가 리포트</title>'+
+      '<style>body{font-family:"Malgun Gothic",sans-serif;padding:22px;color:#111;line-height:1.6;font-size:12px}'+
+      'h1{font-size:20px;margin:0 0 2px}.sub{color:#666;font-size:12px;margin:0 0 14px}'+
+      'h2{font-size:14px;margin:16px 0 6px;border-bottom:2px solid #333;padding-bottom:3px}'+
+      'table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #999;padding:4px 6px;font-size:11px;vertical-align:top}th{background:#eee}'+
+      '.score{font-size:26px;font-weight:800;color:#7c3aed}.qa{margin-bottom:8px}.q{font-weight:700}.a{border:1px solid #ccc;border-radius:5px;padding:6px 8px;white-space:pre-wrap}'+
+      '.cmt{border:1px solid #7c3aed;border-radius:6px;padding:8px 10px;background:#f6f3ff}'+
+      '@media print{@page{size:A4;margin:12mm}}</style></head><body>'+
+      '<h1>🧑‍🏫 과정평가 리포트</h1><p class="sub">'+escapeHtml(s.name||'')+' ('+escapeHtml(s.email||'')+') · 별명 '+escapeHtml(s.nickname||'')+'</p>'+
+      '<h2>📊 투자 성과·활동 요약</h2>'+
+      '<table><tr><th>수익률</th><th>총자산</th><th>거래</th><th>근거작성</th><th>분산업종</th><th>기록지</th><th>배지</th></tr>'+
+      '<tr><td>'+fmtPct(sm.returnPct)+'</td><td>'+fmt(sm.totalValue)+'원</td><td>'+(sm.tradeCount||0)+'회</td><td>'+(sm.reasonedCount||0)+'/'+(sm.tradeCount||0)+'</td><td>'+(sm.sectorCount||0)+'개</td><td>'+(sm.noteCount||0)+'건</td><td>'+(sm.badgeCount||0)+'개</td></tr></table>'+
+      '<h2>📓 거래 내역·근거</h2>'+ (trades?('<table><tr><th>날짜</th><th>구분</th><th>종목</th><th>수량</th><th>근거</th></tr>'+trades+'</table>'):'<p>거래 없음</p>') +
+      (notes?('<h2>📰 이슈 기록지</h2><ul>'+notes+'</ul>'):'')+
+      '<h2>📔 성찰</h2>'+qa+ (prin?('<div class="q">나만의 금융 원칙</div><ol>'+prin+'</ol>'):'') +
+      '<h2>✍️ 평가</h2>'+
+      (typeof ev.total==='number' ? '<p class="score">'+ev.total+' / 100점</p><table><tr><th>항목</th><th>기준</th><th>점수</th></tr>'+rubRows+'</table>' : '<p>아직 채점하지 않았습니다.</p>')+
+      (ev.comment?('<div class="q" style="margin-top:8px">코멘트</div><div class="cmt">'+escapeHtml(ev.comment)+'</div>'):'')+
+      '</body></html>';
+    var w = window.open('', '_blank'); if(!w){ toast('팝업을 허용해 주세요.', 'warn'); return; }
+    w.document.write(html); w.document.close(); w.onload=function(){ w.focus(); w.print(); };
+  }
+  function printAllScores(){
+    if(!GR_SUBS.length){ toast('제출물이 없어요.', 'warn'); return; }
+    var g = SSAMJI_GROUP.getState();
+    var rows = GR_SUBS.map(function(s,i){
+      var ev=s.eval||{}, sm=s.summary||{};
+      return '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(s.name||'')+'</td><td>'+escapeHtml(s.nickname||'')+'</td>'+
+        '<td style="text-align:center">'+fmtPct(sm.returnPct)+'</td><td style="text-align:center">'+(sm.tradeCount||0)+'</td>'+
+        '<td style="text-align:center">'+(typeof ev.total==='number'?ev.total:'—')+'</td><td>'+escapeHtml(ev.comment||'')+'</td></tr>';
+    }).join('');
+    var html='<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>학급 점수표</title>'+
+      '<style>body{font-family:"Malgun Gothic",sans-serif;padding:20px;color:#111}h1{font-size:18px}'+
+      'table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:5px 7px;font-size:12px}th{background:#eee}'+
+      '@media print{@page{size:A4;margin:12mm}}</style></head><body>'+
+      '<h1>🧑‍🏫 '+escapeHtml(g.name||'')+' 과정평가 점수표</h1>'+
+      '<table><tr><th>#</th><th>이름</th><th>별명</th><th>수익률</th><th>거래수</th><th>점수</th><th>코멘트</th></tr>'+rows+'</table></body></html>';
+    var w=window.open('','_blank'); if(!w){ toast('팝업을 허용해 주세요.','warn'); return; }
+    w.document.write(html); w.document.close(); w.onload=function(){ w.focus(); w.print(); };
+  }
+
   // ---------------- 설정 모달 ----------------
   function setupSettings(){
     on($('btnSettings'), 'click', function(){ openSettings(); });
@@ -1029,9 +1315,10 @@
         toast('🔐 교사 로그인 완료', 'ok');
         $('groupGate').hidden = true;
         if(SSAMJI_FB_READY) SSAMJI_RANK.subscribe();
-        state.activeTab = 'rank';
-        document.querySelector('[data-tab="rank"]').click();
-        renderRanking();
+        updateAdminUI();
+        state.activeTab = 'grade';
+        document.querySelector('[data-tab="grade"]').click();
+        renderGrade();
       }catch(e){ toast('❌ '+e.message, 'err'); }
     });
     on($('btnGrpJoin'), 'click', async function(){
@@ -1043,21 +1330,22 @@
         await SSAMJI_GROUP.joinGroup(code, nick);
         toast('학급에 참가했어요!', 'ok');
         $('groupGate').hidden = true;
-        renderRanking();
+        renderRanking(); updateAdminUI();
       }catch(e){ toast('❌ '+e.message, 'err'); }
     });
     on($('btnGrpCreate'), 'click', async function(){
       var name = $('gcName').value.trim();
       var nick = $('gcNick').value.trim();
       var pin = ($('gcPin') ? $('gcPin').value.trim() : '');
+      var dom = ($('gcDomain') ? $('gcDomain').value.trim() : '');
       if(!name || !nick){ toast('학급명·별명을 입력해 주세요', 'err'); return; }
       if(pin && pin.length < 4){ toast('교사 PIN은 4자리 이상으로 정해 주세요', 'err'); return; }
       try{
-        var code = await SSAMJI_GROUP.createGroup(name, nick, pin);
+        var code = await SSAMJI_GROUP.createGroup(name, nick, pin, dom);
         prompt('학급 코드가 발급됐어요. 학생들에게 이 코드를 알려주세요:', code);
         toast('학급 생성 완료: '+code, 'ok');
         $('groupGate').hidden = true;
-        renderRanking();
+        renderRanking(); updateAdminUI();
       }catch(e){ toast('❌ '+e.message, 'err'); }
     });
     on($('btnGrpSkip'), 'click', function(){ $('groupGate').hidden = true; });

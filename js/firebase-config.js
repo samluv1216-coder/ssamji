@@ -17,6 +17,8 @@ window.SSAMJI_FB_READY = false;
 window.SSAMJI_FB_DB = null;
 window.SSAMJI_FB_UID = null;
 
+window.SSAMJI_FB_USER = null;   // 현재 인증 사용자 (익명 또는 구글)
+
 window.initFirebase = function(){
   if(!window.firebase || !SSAMJI_FIREBASE_CONFIG.apiKey) return false;
   try{
@@ -24,14 +26,22 @@ window.initFirebase = function(){
       firebase.initializeApp(SSAMJI_FIREBASE_CONFIG);
     }
     SSAMJI_FB_DB = firebase.firestore();
-    // 익명 인증
-    firebase.auth().signInAnonymously().then(function(cred){
-      SSAMJI_FB_UID = cred.user.uid;
-      SSAMJI_FB_READY = true;
-      console.log('[SSAMJI] Firebase 익명 인증 완료', SSAMJI_FB_UID.slice(0,8));
-      document.dispatchEvent(new CustomEvent('ssamji:firebase-ready'));
-    }).catch(function(e){
-      console.warn('[SSAMJI] Firebase 익명 인증 실패:', e.message);
+    var dispatched = false;
+    // ⚠️ signInAnonymously를 무조건 호출하면 저장된 구글 로그인이 익명으로 덮여
+    //    제출 신원이 사라짐. → 저장된 사용자가 있으면 유지, 없을 때만 익명 로그인.
+    firebase.auth().onAuthStateChanged(function(user){
+      if(user){
+        SSAMJI_FB_UID = user.uid;
+        SSAMJI_FB_USER = user;
+        SSAMJI_FB_READY = true;
+        console.log('[SSAMJI] 인증:', user.isAnonymous ? '익명' : ('구글 '+(user.email||'')), SSAMJI_FB_UID.slice(0,8));
+        if(!dispatched){ dispatched = true; document.dispatchEvent(new CustomEvent('ssamji:firebase-ready')); }
+        document.dispatchEvent(new CustomEvent('ssamji:auth-changed'));
+      } else {
+        firebase.auth().signInAnonymously().catch(function(e){
+          console.warn('[SSAMJI] 익명 인증 실패:', e.message);
+        });
+      }
     });
     return true;
   }catch(e){
