@@ -32,7 +32,7 @@
     var contents = messages.map(function(m){
       return { role: m.role==='assistant'?'model':'user', parts:[{text:m.content}] };
     });
-    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent', {
       method:'POST',
       headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
       body: JSON.stringify({ contents: contents })
